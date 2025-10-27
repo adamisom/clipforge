@@ -13,6 +13,8 @@ function createWindow(): void {
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
+      contextIsolation: true,     // CRITICAL: Isolates renderer from Electron APIs
+      nodeIntegration: false,     // CRITICAL: Prevents direct Node.js access in renderer
       sandbox: false
     }
   })
