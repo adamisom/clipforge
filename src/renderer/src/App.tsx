@@ -4,8 +4,21 @@ import electronLogo from './assets/electron.svg'
 function App(): React.JSX.Element {
   const ipcHandle = (): void => window.electron.ipcRenderer.send('ping')
 
+  // Drag and drop handlers
+  const handleDragOver = (e: React.DragEvent): void => {
+    e.preventDefault()
+  }
+
+  const handleDrop = (e: React.DragEvent): void => {
+    e.preventDefault()
+    // TODO: Implement video import when IPC handlers are set up
+    // For now, just log the files
+    const files = Array.from(e.dataTransfer.files)
+    console.log('Files dropped:', files.map(f => f.name))
+  }
+
   return (
-    <>
+    <div onDragOver={handleDragOver} onDrop={handleDrop}>
       <img alt="logo" className="logo" src={electronLogo} />
       <div className="creator">Powered by electron-vite</div>
       <div className="text">
@@ -28,7 +41,7 @@ function App(): React.JSX.Element {
         </div>
       </div>
       <Versions></Versions>
-    </>
+    </div>
   )
 }
 
