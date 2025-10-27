@@ -110,7 +110,7 @@ npm install react-resizable  # For trim handles
 ### 1. Application Launcher
 **Requirements:**
 - Desktop app launches successfully
-- Window sizing: 1280x720 minimum
+- Window sizing: 900x670 (default) minimum (1280x720 was initial target)
 - Basic menu bar (File > Open, File > Export, Edit > Quit)
 
 **Implementation:**
