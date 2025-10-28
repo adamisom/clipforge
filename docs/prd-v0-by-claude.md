@@ -1417,31 +1417,34 @@ ipcMain.handle('export-video', async (event, inputPath, outputPath, options) => 
 ```typescript
 import { contextBridge, ipcRenderer } from 'electron';
 
-contextBridge.exposeInMainWorld('electronAPI', {
+const api = {
   selectVideoFile: () => ipcRenderer.invoke('select-video-file'),
-  exportVideo: (inputPath, outputPath, options) => 
-    ipcRenderer.invoke('export-video', inputPath, outputPath, options),
-  onExportProgress: (callback) => 
-    ipcRenderer.on('export-progress', (_, progress) => callback(progress))
-});
+  getVideoMetadata: (path: string) => ipcRenderer.invoke('get-video-metadata', path),
+  exportVideo: (sourcePath, outputPath, trimStart, duration) => 
+    ipcRenderer.invoke('export-video', { sourcePath, outputPath, trimStart, duration }),
+  selectSavePath: () => ipcRenderer.invoke('select-save-path')
+};
+
+contextBridge.exposeInMainWorld('api', api);
 ```
 
 **3. Renderer (React component)** - Uses exposed API:
 ```tsx
 function VideoEditor() {
   const handleImport = async () => {
-    const filePath = await window.electronAPI.selectVideoFile();
-    if (filePath) {
-      // Process file
-    }
+    const filePath = await window.api.selectVideoFile();
+    if (!filePath) return;
+    
+    // Get metadata (includes filename extracted in main process)
+    const metadata = await window.api.getVideoMetadata(filePath);
+    // metadata contains: { duration, width, height, codec, filename }
   };
   
   const handleExport = async () => {
-    const result = await window.electronAPI.exportVideo(input, output, options);
-    if (result.success) {
-      alert('Export complete!');
-    }
-  };
+    const outputPath = await window.api.selectSavePath();
+    if (!outputPath) return;
+    
+    await window.api.exportVideo(sourcePath, outputPath, trimStart, duration);
   
   return (
     <>
