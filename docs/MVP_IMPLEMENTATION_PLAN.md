@@ -51,7 +51,43 @@ interface VideoState {
 
 **Goal**: Set up secure communication between processes
 
+### Files to modify/create:
+- **Modify**: `src/main/index.ts` (add IPC handlers)
+- **Modify**: `src/preload/index.ts` (expose API)
+- **Modify**: `src/preload/index.d.ts` (TypeScript definitions)
+
 ### 1.1 Main Process IPC Handlers
+- [ ] File to modify: `src/main/index.ts`
+- [ ] Add imports at top of file:
+  ```typescript
+  import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
+  import { join } from 'path'
+  import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+  import icon from '../../resources/icon.png?asset'
+  import ffmpeg from 'fluent-ffmpeg'
+  import ffmpegInstaller from '@ffmpeg-installer/ffmpeg'
+  import fs from 'fs'
+  ```
+
+- [ ] Add FFmpeg setup (after imports, before createWindow):
+  ```typescript
+  // Set up FFmpeg binary path (dev vs production)
+  const ffmpegPath = app.isPackaged
+    ? join(process.resourcesPath, 'ffmpeg')
+    : ffmpegInstaller.path;
+  
+  if (!fs.existsSync(ffmpegPath)) {
+    console.error('FFmpeg not found at:', ffmpegPath);
+  }
+  
+  ffmpeg.setFfmpegPath(ffmpegPath);
+  ```
+
+- [ ] Add IPC handlers after `app.whenReady()`:
+  ```typescript
+  // Remove the test handler: ipcMain.on('ping', ...)
+  ```
+
 - [ ] Implement `ipcMain.handle('select-video-file')`:
   ```typescript
   ipcMain.handle('select-video-file', async () => {
@@ -86,18 +122,46 @@ interface VideoState {
 
 - [ ] Implement `ipcMain.handle('export-video', { sourcePath, outputPath, trimStart, duration })`:
   ```typescript
-  // Use fluent-ffmpeg to trim and export
-  // Handle FFmpeg setup (dev vs production paths)
+  // NOTE: Full implementation in Phase 7.3, but stub needed here
+  ipcMain.handle('export-video', async (event, { sourcePath, outputPath, trimStart, duration }) => {
+    const mainWindow = BrowserWindow.getAllWindows()[0];
+    
+    // ffmpegPath is already set globally (see setup above)
+    
+    return new Promise((resolve, reject) => {
+      ffmpeg(sourcePath)
+        .setStartTime(trimStart)
+        .setDuration(duration)
+        .output(outputPath)
+        .on('progress', (progress) => {
+          mainWindow.webContents.send('export-progress', progress);
+        })
+        .on('end', () => {
+          mainWindow.webContents.send('export-complete');
+          resolve({ success: true });
+        })
+        .on('error', (err) => {
+          mainWindow.webContents.send('export-error', { message: err.message });
+          reject(err);
+        })
+        .run();
+    });
+  });
   ```
 
 - [ ] Implement `ipcMain.handle('select-save-path')`:
   ```typescript
-  // Show save dialog
-  // Return selected path
+  ipcMain.handle('select-save-path', async () => {
+    const result = await dialog.showSaveDialog({
+      defaultPath: 'trimmed-video.mp4',
+      filters: [{ name: 'MP4', extensions: ['mp4'] }]
+    });
+    return result.canceled ? null : result.filePath;
+  });
   ```
 
-- [ ] Set up FFmpeg binary path logic (app.isPackaged check)
-- **Test**: Console logs when handlers are called
+- [ ] Verify FFmpeg setup is in place (see setup above)
+- **Test**: Console logs when handlers are called, verify FFmpeg path is set
 
 ### 1.2 Preload Script - Expose API
 - [ ] Update `src/preload/index.ts`:
@@ -151,67 +215,255 @@ interface VideoState {
 
 **Goal**: Create editor layout and import capability
 
+### Files to modify/create:
+- **Modify**: `src/renderer/src/App.tsx` (add conditional rendering, state, handlers)
+- **Create** (optional): `src/renderer/src/components/WelcomeScreen.tsx`
+- **Create** (optional): `src/renderer/src/components/VideoEditor.tsx`
+- **Create**: `src/renderer/src/components/VideoInfo.tsx`
+- **Modify**: `src/renderer/src/assets/main.css` (add layout styles)
+
 ### 2.1 Create Basic Layout Components
+- [ ] Update `src/renderer/src/App.tsx`:
+  - Remove existing welcome screen content
+  - Add conditional rendering
+
 - [ ] Replace welcome screen with conditional rendering:
   ```typescript
-  {!videoState.sourcePath ? <WelcomeScreen /> : <VideoEditor />}
+  return (
+    <>
+      {!videoState.sourcePath ? <WelcomeScreen /> : <VideoEditor videoState={videoState} />}
+    </>
+  );
   ```
 
-- [ ] Create `WelcomeScreen` component with:
-  - Import button
-  - Drag-and-drop target (already partially implemented)
-  - App branding
+- [ ] Create `WelcomeScreen` component inline or in new file `src/renderer/src/components/WelcomeScreen.tsx`:
+  ```typescript
+  function WelcomeScreen({ onImport }) {
+    return (
+      <div className="welcome-screen">
+        <h1>ClipForge</h1>
+        <p>Import a video to get started</p>
+        <button onClick={onImport}>Import Video</button>
+      </div>
+    );
+  }
+  ```
 
-- [ ] Create `VideoEditor` component shell with three panels:
-  - Top: Preview area (placeholder)
-  - Bottom: Timeline area (placeholder)  
-  - Right: Info panel (placeholder)
+- [ ] Create `VideoEditor` component inline or in new file `src/renderer/src/components/VideoEditor.tsx`:
+  ```typescript
+  function VideoEditor({ videoState }) {
+    return (
+      <div className="video-editor">
+        <div className="preview-panel">
+          {/* Placeholder */}
+        </div>
+        <div className="timeline-panel">
+          {/* Placeholder */}
+        </div>
+        <div className="info-panel">
+          {/* Placeholder */}
+        </div>
+      </div>
+    );
+  }
+  ```
 
-- [ ] Style with flexbox layout
+- [ ] Add basic CSS in `src/renderer/src/assets/main.css`:
+  ```css
+  .welcome-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+  }
+  
+  .video-editor {
+    display: grid;
+    grid-template-rows: 1fr auto;
+    height: 100vh;
+  }
+  
+  .preview-panel {
+    background: #000;
+  }
+  
+  .timeline-panel {
+    background: #1a1a1a;
+    height: 200px;
+  }
+  
+  .info-panel {
+    background: #2a2a2a;
+    width: 250px;
+  }
+  ```
 - **Test**: Layout renders correctly, no video shows welcome screen
 
 ### 2.2 Implement Import via Button
-- [ ] Add import handler in App:
+- [ ] Add import handler in `App.tsx` (after state declaration):
   ```typescript
   const handleImport = async () => {
-    const filePath = await window.api.selectVideoFile();
-    if (!filePath) return;
-    
-    // Get metadata
-    const metadata = await window.api.getVideoMetadata(filePath);
-    
-    // Update state (filename comes from metadata API)
-    setVideoState({
-      sourcePath: filePath,
-      duration: metadata.duration,
-      trimStart: 0,
-      trimEnd: metadata.duration,
-      playheadPosition: 0,
-      isPlaying: false,
-      metadata: {
-        filename: metadata.filename,
-        resolution: `${metadata.width}x${metadata.height}`
-      }
-    });
+    try {
+      const filePath = await window.api.selectVideoFile();
+      if (!filePath) return;
+      
+      // Get metadata
+      const metadata = await window.api.getVideoMetadata(filePath);
+      
+      // Update state (filename comes from metadata API)
+      setVideoState({
+        sourcePath: filePath,
+        duration: metadata.duration,
+        trimStart: 0,
+        trimEnd: metadata.duration,
+        playheadPosition: 0,
+        isPlaying: false,
+        metadata: {
+          filename: metadata.filename,
+          resolution: `${metadata.width}x${metadata.height}`
+        }
+      });
+    } catch (error) {
+      console.error('Import failed:', error);
+      alert(`Failed to import video: ${error.message}`);
+    }
   };
   ```
-- [ ] Connect button to handler
+
+- [ ] Update WelcomeScreen to receive and use onImport prop:
+  ```typescript
+  <WelcomeScreen onImport={handleImport} />
+  ```
+
+- [ ] Connect import button in WelcomeScreen:
+  ```typescript
+  <button onClick={onImport}>Import Video</button>
+  ```
+
 - **Test**: Importing video switches from welcome to editor
 
 ### 2.3 Implement Drag-and-Drop Import
-- [ ] Update existing drag handler in App.tsx to:
-  - Filter for video files (mp4, mov)
-  - Call same import handler as button
-  - Show loading feedback
+- [ ] Update existing drag handler in `App.tsx` (already partially implemented):
+  ```typescript
+  const handleDragOver = (e: React.DragEvent): void => {
+    e.preventDefault();
+  };
+
+  const handleDrop = async (e: React.DragEvent): void => {
+    e.preventDefault();
+    
+    const files = Array.from(e.dataTransfer.files);
+    const videoFiles = files.filter(file => {
+      const ext = file.name.toLowerCase().split('.').pop();
+      return ['mp4', 'mov'].includes(ext);
+    });
+    
+    if (videoFiles.length === 0) {
+      alert('Please drop a video file (MP4 or MOV)');
+      return;
+    }
+    
+    // Get file path (Electron provides path property)
+    const filePath = videoFiles[0].path;
+    if (!filePath) return;
+    
+    // Call same import logic as button handler
+    try {
+      const metadata = await window.api.getVideoMetadata(filePath);
+      setVideoState({
+        sourcePath: filePath,
+        duration: metadata.duration,
+        trimStart: 0,
+        trimEnd: metadata.duration,
+        playheadPosition: 0,
+        isPlaying: false,
+        metadata: {
+          filename: metadata.filename,
+          resolution: `${metadata.width}x${metadata.height}`
+        }
+      });
+    } catch (error) {
+      console.error('Drag-and-drop import failed:', error);
+      alert(`Failed to import video: ${error.message}`);
+    }
+  };
+
+  // Apply to main container
+  <div onDragOver={handleDragOver} onDrop={handleDrop}>
+    {/* ... content ... */}
+  </div>
+  ```
+
 - **Test**: Dragging video imports it
 
 ### 2.4 Add Video Info Panel
-- [ ] Create `VideoInfo` component showing:
-  - Filename
-  - Resolution
-  - Full duration
-  - Trim range (trimStart to trimEnd)
-- [ ] Add styling
+- [ ] Create `VideoInfo` component in `src/renderer/src/components/VideoInfo.tsx`:
+  ```typescript
+  import React from 'react';
+
+  interface VideoInfoProps {
+    videoState: {
+      metadata: {
+        filename: string;
+        resolution: string;
+      };
+      duration: number;
+      trimStart: number;
+      trimEnd: number;
+    };
+  }
+
+  function VideoInfo({ videoState }: VideoInfoProps) {
+    const formatTime = (seconds: number): string => {
+      const mins = Math.floor(seconds / 60);
+      const secs = Math.floor(seconds % 60);
+      return `${mins}:${secs.toString().padStart(2, '0')}`;
+    };
+
+    return (
+      <div className="video-info">
+        <h3>Video Info</h3>
+        <div className="info-item">
+          <strong>File:</strong> {videoState.metadata.filename}
+        </div>
+        <div className="info-item">
+          <strong>Resolution:</strong> {videoState.metadata.resolution}
+        </div>
+        <div className="info-item">
+          <strong>Duration:</strong> {formatTime(videoState.duration)}
+        </div>
+        <div className="info-item">
+          <strong>Trim:</strong> {formatTime(videoState.trimStart)} - {formatTime(videoState.trimEnd)}
+        </div>
+      </div>
+    );
+  }
+
+  export default VideoInfo;
+  ```
+
+- [ ] Add to VideoEditor component:
+  ```typescript
+  import VideoInfo from './components/VideoInfo';
+  
+  <div className="info-panel">
+    <VideoInfo videoState={videoState} />
+  </div>
+  ```
+
+- [ ] Add styling to `main.css`:
+  ```css
+  .video-info {
+    padding: 16px;
+    color: #fff;
+  }
+  
+  .info-item {
+    margin: 8px 0;
+  }
+  ```
+
 - **Test**: Info panel displays imported video details
 
 **Checkpoint 2**: Can import videos and see UI switch to editor
@@ -223,13 +475,64 @@ interface VideoState {
 
 **Goal**: Display video clip on timeline with visual representation
 
+### Files to modify/create:
+- **Create**: `src/renderer/src/components/Timeline.tsx`
+- **Modify**: `src/renderer/src/components/VideoEditor.tsx` (add Timeline)
+- **Modify**: `src/renderer/src/assets/main.css` (timeline styles)
+
 ### 3.1 Create Timeline Component Structure
-- [ ] Create `Timeline` component with:
-  - Time ruler showing seconds (0 to duration)
-  - Track area for clips
-  - Playhead indicator
-- [ ] Calculate `pixelsPerSecond` based on video duration
-- [ ] Style timeline with fixed height, horizontal scroll
+- [ ] Create `src/renderer/src/components/Timeline.tsx`:
+  ```typescript
+  import React from 'react';
+  
+  interface TimelineProps {
+    duration: number;
+    trimStart: number;
+    trimEnd: number;
+    playheadPosition: number;
+  }
+  
+  function Timeline({ duration, trimStart, trimEnd, playheadPosition }: TimelineProps) {
+    // Calculate pixels per second (300px for 1 second by default)
+    const pixelsPerSecond = 300;
+    const timelineWidth = duration * pixelsPerSecond;
+    
+    return (
+      <div className="timeline-container" style={{ width: `${timelineWidth}px` }}>
+        <div className="time-ruler">
+          {/* Time marks will go here */}
+        </div>
+        <div className="timeline-track">
+          {/* Clip and playhead will go here */}
+        </div>
+      </div>
+    );
+  }
+  
+  export default Timeline;
+  ```
+
+- [ ] Add CSS to `main.css`:
+  ```css
+  .timeline-container {
+    height: 120px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    position: relative;
+  }
+  
+  .time-ruler {
+    height: 30px;
+    border-bottom: 1px solid #444;
+    position: relative;
+  }
+  
+  .timeline-track {
+    height: 90px;
+    position: relative;
+  }
+  ```
+
 - **Test**: Timeline renders with correct width for video duration
 
 ### 3.2 Add Time Ruler
@@ -265,28 +568,86 @@ interface VideoState {
 
 **Goal**: Show video preview with position indicator
 
+### Files to modify/create:
+- **Create**: `src/renderer/src/components/VideoPreview.tsx`
+- **Modify**: `src/renderer/src/components/VideoEditor.tsx` (add VideoPreview)
+- **Modify**: `src/renderer/src/assets/main.css` (preview styles)
+
 ### 4.1 Create VideoPreview Component
-- [ ] Create component with HTML5 `<video>` element
-- [ ] IMPORTANT: Ensure `webSecurity: false` is set in main process for development
-  - Check `src/main/index.ts` WebPreferences
-  - Should have: `webSecurity: false` (for `file://` URLs in dev)
-- [ ] Set video source:
+- [ ] Create `src/renderer/src/components/VideoPreview.tsx`:
   ```typescript
-  <video 
-    src={`file://${videoState.sourcePath}`}
-    ref={videoRef}
-    onTimeUpdate={handleTimeUpdate}
-  />
+  import React, { useRef, useEffect, useState } from 'react';
+  
+  interface VideoPreviewProps {
+    sourcePath: string | null;
+    trimStart: number;
+    isPlaying: boolean;
+    onPlayPause: () => void;
+  }
+  
+  function VideoPreview({ sourcePath, trimStart, isPlaying, onPlayPause }: VideoPreviewProps) {
+    const videoRef = useRef<HTMLVideoElement>(null);
+    
+    // Sync initial video position
+    useEffect(() => {
+      if (videoRef.current && sourcePath) {
+        videoRef.current.currentTime = trimStart;
+      }
+    }, [sourcePath, trimStart]);
+    
+    // Handle time updates during playback
+    const handleTimeUpdate = () => {
+      // Will be implemented in Phase 6 with playhead sync
+    };
+    
+    return (
+      <div className="video-preview-container">
+        <video 
+          ref={videoRef}
+          src={sourcePath ? `file://${sourcePath}` : undefined}
+          onTimeUpdate={handleTimeUpdate}
+          style={{ width: '100%', height: '100%' }}
+        />
+        <div className="video-controls">
+          <button onClick={onPlayPause}>
+            {isPlaying ? 'Pause' : 'Play'}
+          </button>
+        </div>
+      </div>
+    );
+  }
+  
+  export default VideoPreview;
   ```
-- [ ] Add useEffect to sync initial video position:
+
+- [ ] IMPORTANT: Ensure `webSecurity: false` is set in `src/main/index.ts`:
   ```typescript
-  useEffect(() => {
-    if (videoRef.current && videoState.sourcePath) {
-      videoRef.current.currentTime = videoState.trimStart;
-    }
-  }, [videoState.sourcePath]);
+  webPreferences: {
+    preload: join(__dirname, '../preload/index.js'),
+    contextIsolation: true,
+    nodeIntegration: false,
+    sandbox: false,
+    webSecurity: false  // ADD THIS for development
+  }
   ```
-- [ ] Add play/pause button
+
+- [ ] Add CSS:
+  ```css
+  .video-preview-container {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    background: #000;
+  }
+  
+  .video-controls {
+    position: absolute;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+  ```
+
 - **Test**: Video loads and preview works
 
 ### 4.2 Add Playhead Component
@@ -345,38 +706,107 @@ interface VideoState {
 
 **Goal**: User can adjust start and end points
 
+### Files to modify:
+- **Modify**: `src/renderer/src/components/Timeline.tsx` (add trim handles)
+- **Modify**: `src/renderer/src/components/VideoPreview.tsx` (sync with trim)
+- **Modify**: `src/renderer/src/assets/main.css` (trim handle styles)
+
 ### 5.1 Add Visual Trim Handles
-- [ ] Add left handle (trim start) and right handle (trim end) on clip
-- [ ] Style handles (small draggable areas at clip edges)
-- [ ] Position handles at clip edges
+- [ ] Update Timeline component to add trim handles on clip:
+  ```typescript
+  // In Timeline.tsx, in the clip div:
+  <div className="timeline-clip" style={{ /* ... */ }}>
+    {videoState.metadata.filename}
+    
+    {/* Left trim handle */}
+    <div 
+      className="trim-handle trim-handle-left"
+      style={{
+        position: 'absolute',
+        left: '0',
+        top: '0',
+        bottom: '0',
+        width: '8px',
+        cursor: 'ew-resize'
+      }}
+      onMouseDown={(e) => handleTrimDragStart(e, 'start')}
+    />
+    
+    {/* Right trim handle */}
+    <div 
+      className="trim-handle trim-handle-right"
+      style={{
+        position: 'absolute',
+        right: '0',
+        top: '0',
+        bottom: '0',
+        width: '8px',
+        cursor: 'ew-resize'
+      }}
+      onMouseDown={(e) => handleTrimDragStart(e, 'end')}
+    />
+  </div>
+  ```
+
+- [ ] Add CSS for handles:
+  ```css
+  .trim-handle {
+    background: #007AFF;
+    opacity: 0.7;
+  }
+  
+  .trim-handle:hover {
+    opacity: 1;
+    background: #0066FF;
+  }
+  ```
+
 - **Test**: Handles appear on clip edges
 
 ### 5.2 Make Trim Handles Draggable
-- [ ] Add mousedown/mousemove/mouseup handlers to handles
-- [ ] Add global mouse event cleanup:
+- [ ] Add drag state and handlers to Timeline component:
   ```typescript
-  useEffect(() => {
-    if (isDragging) {
-      const handleMouseUp = () => setIsDragging(false);
-      window.addEventListener('mouseup', handleMouseUp);
-      return () => window.removeEventListener('mouseup', handleMouseUp);
-    }
-  }, [isDragging]);
-  ```
-- [ ] Calculate new trim position on drag:
-  ```typescript
-  const handleTrimDrag = (type: 'start' | 'end', deltaX: number) => {
-    const deltaTime = deltaX / pixelsPerSecond;
-    if (type === 'start') {
-      const newStart = Math.max(0, Math.min(trimStart + deltaTime, trimEnd - 0.1));
-      setVideoState(prev => ({ ...prev, trimStart: newStart }));
-    } else {
-      const newEnd = Math.max(trimStart + 0.1, Math.min(duration, trimEnd + deltaTime));
-      setVideoState(prev => ({ ...prev, trimEnd: newEnd }));
-    }
+  const [isDraggingTrim, setIsDraggingTrim] = useState(false);
+  const [dragType, setDragType] = useState<'start' | 'end' | null>(null);
+  const [startX, setStartX] = useState(0);
+  
+  const handleTrimDragStart = (e: React.MouseEvent, type: 'start' | 'end') => {
+    setIsDraggingTrim(true);
+    setDragType(type);
+    setStartX(e.clientX);
   };
+  
+  useEffect(() => {
+    if (!isDraggingTrim) return;
+    
+    const handleMouseMove = (e: MouseEvent) => {
+      const deltaX = e.clientX - startX;
+      const deltaTime = deltaX / pixelsPerSecond;
+      
+      if (dragType === 'start') {
+        const newStart = Math.max(0, Math.min(trimStart + deltaTime, trimEnd - 0.1));
+        setVideoState(prev => ({ ...prev, trimStart: newStart }));
+      } else if (dragType === 'end') {
+        const newEnd = Math.max(trimStart + 0.1, Math.min(duration, trimEnd + deltaTime));
+        setVideoState(prev => ({ ...prev, trimEnd: newEnd }));
+      }
+    };
+    
+    const handleMouseUp = () => {
+      setIsDraggingTrim(false);
+      setDragType(null);
+    };
+    
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDraggingTrim, dragType, startX, trimStart, trimEnd, duration]);
   ```
-- [ ] Clamp values to valid ranges (trimStart < trimEnd, within 0 to duration)
+
 - **Test**: Dragging handles updates trim points
 
 ### 5.3 Update Clip Visual on Trim
@@ -401,30 +831,65 @@ interface VideoState {
 
 **Goal**: Drag playhead to scrub through video
 
+### Files to modify:
+- **Modify**: `src/renderer/src/components/Timeline.tsx` (playhead drag)
+- **Modify**: `src/renderer/src/components/VideoPreview.tsx` (scrub video)
+
 ### 6.1 Make Playhead Draggable
-- [ ] Add mousedown handler to playhead
-- [ ] Track drag state
+- [ ] Add drag state to Timeline component:
+  ```typescript
+  const [isDraggingPlayhead, setIsDraggingPlayhead] = useState(false);
+  const playheadRef = useRef<HTMLDivElement>(null);
+  
+  const handlePlayheadDragStart = (e: React.MouseEvent) => {
+    setIsDraggingPlayhead(true);
+    e.preventDefault();
+  };
+  ```
+
 - **Test**: Can start dragging playhead
 
 ### 6.2 Update Position on Drag
-- [ ] Calculate new playhead position on mousemove:
+- [ ] Add mouse move and up handlers:
   ```typescript
-  const handlePlayheadDrag = (clientX: number) => {
-    const timelineRect = timelineRef.current.getBoundingClientRect();
-    const x = clientX - timelineRect.left;
-    const newTime = Math.max(0, Math.min((trimEnd - trimStart), x / pixelsPerSecond));
-    setVideoState(prev => ({ ...prev, playheadPosition: newTime }));
-  };
+  useEffect(() => {
+    if (!isDraggingPlayhead) return;
+    
+    const handleMouseMove = (e: MouseEvent) => {
+      const timelineRect = timelineRef.current.getBoundingClientRect();
+      const x = e.clientX - timelineRect.left;
+      const newTime = Math.max(0, Math.min((trimEnd - trimStart), x / pixelsPerSecond));
+      setVideoState(prev => ({ ...prev, playheadPosition: newTime }));
+    };
+    
+    const handleMouseUp = () => {
+      setIsDraggingPlayhead(false);
+    };
+    
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDraggingPlayhead, trimStart, trimEnd]);
   ```
-- [ ] Update video currentTime to match:
+
+- [ ] Update VideoPreview to sync currentTime:
   ```typescript
-  videoRef.current.currentTime = trimStart + playheadPosition;
+  // In VideoPreview.tsx
+  useEffect(() => {
+    if (videoRef.current && !isPlaying) {
+      videoRef.current.currentTime = trimStart + playheadPosition;
+    }
+  }, [playheadPosition, trimStart, isPlaying]);
   ```
+
 - **Test**: Dragging playhead updates video position
 
 ### 6.3 Smooth Scrubbing Performance
-- [ ] Use `requestAnimationFrame` for smooth updates during drag
-- [ ] Throttle state updates if needed
+- [ ] Use `requestAnimationFrame` if needed (may not be necessary with modern React)
 - **Test**: Scrubbing is smooth
 
 **Checkpoint 6**: Can scrub through video by dragging playhead
@@ -436,10 +901,57 @@ interface VideoState {
 
 **Goal**: Export trimmed video to MP4
 
+### Files to modify/create:
+- **Create**: `src/renderer/src/components/ExportButton.tsx`
+- **Modify**: `src/renderer/src/components/VideoEditor.tsx` (add ExportButton)
+- **Modify**: `src/renderer/src/assets/main.css` (export UI styles)
+
 ### 7.1 Create Export Button
-- [ ] Add "Export" button to UI
-- [ ] Enable only when video is loaded and trimmed
-- [ ] Style button
+- [ ] Create `src/renderer/src/components/ExportButton.tsx`:
+  ```typescript
+  import React from 'react';
+  
+  interface ExportButtonProps {
+    sourcePath: string | null;
+    onExport: () => void;
+    isExporting: boolean;
+  }
+  
+  function ExportButton({ sourcePath, onExport, isExporting }: ExportButtonProps) {
+    const isDisabled = !sourcePath || isExporting;
+    
+    return (
+      <button 
+        onClick={onExport} 
+        disabled={isDisabled}
+        className="export-button"
+      >
+        {isExporting ? 'Exporting...' : 'Export'}
+      </button>
+    );
+  }
+  
+  export default ExportButton;
+  ```
+
+- [ ] Add CSS:
+  ```css
+  .export-button {
+    padding: 12px 24px;
+    font-size: 16px;
+    background: #007AFF;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  
+  .export-button:disabled {
+    background: #666;
+    cursor: not-allowed;
+  }
+  ```
+
 - **Test**: Button appears and is enabled/disabled correctly
 
 ### 7.2 Implement Export Handler
@@ -491,13 +1003,40 @@ interface VideoState {
     })
     .on('error', (err) => {
       // Send error
-      mainWindow.webContents.send('export-error', err.message);
+      mainWindow.webContents.send('export-error', { message: err.message });
     })
     .run();
   ```
 - **Test**: Export creates MP4 file
 
 ### 7.4 Add Export Progress
+- [ ] Add IPC listeners in renderer for export events:
+  ```typescript
+  useEffect(() => {
+    const handleProgress = (event, progress) => {
+      setExportProgress(progress.percent);
+    };
+    
+    const handleComplete = () => {
+      setExportProgress(100);
+      // Show success message
+    };
+    
+    const handleError = (event, { message }) => {
+      // Show error message
+    };
+    
+    window.electron.ipcRenderer.on('export-progress', handleProgress);
+    window.electron.ipcRenderer.on('export-complete', handleComplete);
+    window.electron.ipcRenderer.on('export-error', handleError);
+    
+    return () => {
+      window.electron.ipcRenderer.removeAllListeners('export-progress');
+      window.electron.ipcRenderer.removeAllListeners('export-complete');
+      window.electron.ipcRenderer.removeAllListeners('export-error');
+    };
+  }, []);
+  ```
 - [ ] Show "Exporting..." modal
 - [ ] Display progress percentage
 - [ ] Disable UI during export
@@ -513,42 +1052,47 @@ interface VideoState {
 
 **Goal**: Native macOS menu
 
+### Files to modify:
+- **Modify**: `src/main/index.ts` (add menu definition)
+- **Modify**: `src/renderer/src/App.tsx` (add menu event listeners)
+
 ### 8.1 Create Menu Template
-- [ ] Add menu in main process:
-  ```typescript
-  const menu = Menu.buildFromTemplate([
-    {
-      label: 'File',
-      submenu: [
-        { label: 'Import Video', accelerator: 'CmdOrCtrl+O', click: handleImport },
-        { label: 'Export Video', accelerator: 'CmdOrCtrl+E', click: handleExport },
-        { type: 'separator' },
-        { label: 'Quit', accelerator: 'CmdOrCtrl+Q', role: 'quit' }
-      ]
-    }
-  ]);
-  Menu.setApplicationMenu(menu);
-  ```
+- [ ] Add menu in main process (see 8.2 for complete implementation)
 - **Test**: Menu appears in menu bar
 
 ### 8.2 Connect Menu Actions
 - [ ] Implement menu -> renderer communication:
   ```typescript
-  // In menu click handler
-  mainWindow.webContents.send('menu-import');
-  mainWindow.webContents.send('menu-export');
+  // In main process menu handlers:
+  const menu = Menu.buildFromTemplate([
+    {
+      label: 'File',
+      submenu: [
+        { 
+          label: 'Import Video', 
+          accelerator: 'CmdOrCtrl+O', 
+          click: () => mainWindow.webContents.send('menu-import') 
+        },
+        { 
+          label: 'Export Video', 
+          accelerator: 'CmdOrCtrl+E', 
+          click: () => mainWindow.webContents.send('menu-export') 
+        },
+        { type: 'separator' },
+        { label: 'Quit', accelerator: 'CmdOrCtrl+Q', role: 'quit' }
+      ]
+    }
+  ]);
   ```
 - [ ] In renderer App component, add IPC listeners:
   ```typescript
   useEffect(() => {
-    const handleImport = () => handleImportClick();
-    const handleExport = () => handleExportClick();
-    
-    window.api.onImportMenu(() => handleImport());
-    window.api.onExportMenu(() => handleExport());
+    window.electron.ipcRenderer.on('menu-import', handleImport);
+    window.electron.ipcRenderer.on('menu-export', handleExport);
     
     return () => {
-      // Cleanup listeners
+      window.electron.ipcRenderer.removeAllListeners('menu-import');
+      window.electron.ipcRenderer.removeAllListeners('menu-export');
     };
   }, []);
   ```
@@ -563,23 +1107,85 @@ interface VideoState {
 
 **Goal**: Handle common error cases gracefully
 
+### Files to modify:
+- **Modify**: `src/renderer/src/App.tsx` (add error handling)
+- **Modify**: All component files (add error states)
+- **Modify**: `src/renderer/src/assets/main.css` (error message styles)
+
 ### 9.1 Handle Import Errors
-- [ ] Invalid file type - show error message
-- [ ] Corrupt video file - show error message
-- [ ] FFprobe errors - show user-friendly message
+- [ ] Update import handler in App.tsx:
+  ```typescript
+  const handleImport = async () => {
+    try {
+      const filePath = await window.api.selectVideoFile();
+      if (!filePath) return;
+      
+      const metadata = await window.api.getVideoMetadata(filePath);
+      
+      // Validate metadata
+      if (!metadata.duration || metadata.duration <= 0) {
+        throw new Error('Invalid video file: cannot read duration');
+      }
+      
+      setVideoState({ /* ... */ });
+    } catch (error) {
+      const message = error.message || 'Failed to import video';
+      alert(`Import Error: ${message}`);
+      console.error('Import failed:', error);
+    }
+  };
+  ```
+
 - **Test**: Errors show helpful messages
 
 ### 9.2 Handle Export Errors
-- [ ] FFmpeg not found - show error
-- [ ] Disk full - show error
-- [ ] Export cancelled - handle gracefully
-- [ ] Invalid output path - validate before export
+- [ ] Update export handler with error handling:
+  ```typescript
+  const handleExport = async () => {
+    try {
+      const outputPath = await window.api.selectSavePath();
+      if (!outputPath) return;
+      
+      await window.api.exportVideo(sourcePath, outputPath, trimStart, duration);
+      
+      alert('Export completed successfully!');
+    } catch (error) {
+      alert(`Export failed: ${error.message}`);
+      console.error('Export error:', error);
+    }
+  };
+  ```
+
+- [ ] Add error listener in App.tsx:
+  ```typescript
+  useEffect(() => {
+    const handleExportError = (event, { message }) => {
+      alert(`Export Error: ${message}`);
+    };
+    
+    window.electron.ipcRenderer.on('export-error', handleExportError);
+    
+    return () => {
+      window.electron.ipcRenderer.removeAllListeners('export-error');
+    };
+  }, []);
+  ```
+
 - **Test**: Export errors are handled
 
 ### 9.3 Handle Playback Errors
-- [ ] Video can't play - show error
-- [ ] Network error (if applicable)
-- [ ] Codec not supported - show message
+- [ ] Update VideoPreview component:
+  ```typescript
+  const handleVideoError = () => {
+    alert('Video playback error: Cannot decode this file. Please try a different format.');
+  };
+  
+  <video 
+    // ... other props
+    onError={handleVideoError}
+  />
+  ```
+
 - **Test**: Playback errors don't crash app
 
 **Checkpoint 9**: App handles errors gracefully
@@ -590,6 +1196,10 @@ interface VideoState {
 ## Phase 10: Testing & Refinement
 
 **Goal**: Verify everything works together
+
+### Files to modify:
+- **Modify**: All component files (fix bugs, polish UI)
+- **Modify**: `src/renderer/src/assets/main.css` (final styling)
 
 ### 10.1 End-to-End Testing
 - [ ] Test full workflow:
@@ -624,6 +1234,10 @@ interface VideoState {
 ## Phase 11: Packaging
 
 **Goal**: Create distributable macOS app
+
+### Files to modify:
+- **Modify**: `electron-builder.yml` (bundle FFmpeg)
+- **Modify**: `src/main/index.ts` (ensure FFmpeg path works in production)
 
 ### 11.1 Configure electron-builder
 - [ ] Update `electron-builder.yml` with FFmpeg bundling:

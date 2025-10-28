@@ -317,6 +317,71 @@ declare global {
 }
 ```
 
+### Menu Actions (Event-based IPC)
+
+```typescript
+// Main process menu definition
+const menu = Menu.buildFromTemplate([
+  {
+    label: 'File',
+    submenu: [
+      { 
+        label: 'Import Video', 
+        accelerator: 'CmdOrCtrl+O', 
+        click: () => mainWindow.webContents.send('menu-import') 
+      },
+      { 
+        label: 'Export Video', 
+        accelerator: 'CmdOrCtrl+E', 
+        click: () => mainWindow.webContents.send('menu-export') 
+      },
+      { type: 'separator' },
+      { label: 'Quit', accelerator: 'CmdOrCtrl+Q', role: 'quit' }
+    ]
+  }
+]);
+Menu.setApplicationMenu(menu);
+```
+
+```typescript
+// Renderer listeners
+useEffect(() => {
+  window.electron.ipcRenderer.on('menu-import', handleImport);
+  window.electron.ipcRenderer.on('menu-export', handleExport);
+  
+  return () => {
+    window.electron.ipcRenderer.removeAllListeners('menu-import');
+    window.electron.ipcRenderer.removeAllListeners('menu-export');
+  };
+}, []);
+
+// Also listen to export events
+useEffect(() => {
+  window.electron.ipcRenderer.on('export-progress', (event, progress) => {
+    setExportProgress(progress.percent);
+  });
+  
+  window.electron.ipcRenderer.on('export-complete', () => {
+    // Show success
+  });
+  
+  window.electron.ipcRenderer.on('export-error', (event, { message }) => {
+    // Show error
+  });
+  
+  return () => {
+    window.electron.ipcRenderer.removeAllListeners('export-progress');
+    window.electron.ipcRenderer.removeAllListeners('export-complete');
+    window.electron.ipcRenderer.removeAllListeners('export-error');
+  };
+}, []);
+```
+
+**Key Pattern**: 
+- **Synchronous operations**: Use `ipcRenderer.invoke()` for request-response
+- **Event notifications**: Use `webContents.send()` + `ipcRenderer.on()` for one-way events
+- Main process never needs renderer state
+
 ---
 
 ## Performance Considerations
@@ -407,7 +472,7 @@ ffmpeg(sourcePath)
     mainWindow.webContents.send('export-complete');
   })
   .on('error', (err) => {
-    mainWindow.webContents.send('export-error', err.message);
+    mainWindow.webContents.send('export-error', { message: err.message });
   })
   .run();
 ```
@@ -533,14 +598,23 @@ try {
 ### Export Errors
 
 ```typescript
-window.api.onExportError((error) => {
-  // Error types:
-  // - FFmpeg not found
-  // - Disk full
-  // - Invalid parameters
-  // - Export cancelled
-  // Show error modal
-});
+// Listen to export error events from main process
+useEffect(() => {
+  const handleExportError = (event, errorMessage) => {
+    // Error types:
+    // - FFmpeg not found
+    // - Disk full
+    // - Invalid parameters
+    // - Export cancelled
+    // Show error modal
+  };
+  
+  window.electron.ipcRenderer.on('export-error', handleExportError);
+  
+  return () => {
+    window.electron.ipcRenderer.removeAllListeners('export-error');
+  };
+}, []);
 ```
 
 ### Playback Errors
