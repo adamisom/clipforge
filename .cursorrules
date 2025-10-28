@@ -1,0 +1,81 @@
+# MessageAI Project Rules
+
+## Critical Constraints
+
+### Commit Workflow
+
+- Commit during substantial PR implementation work, before user review
+- Do NOT commit during user's PR review/approval phase unless they ask me to
+<!-- - **Before each commit:** run `npm run validate` (lint + type-check + test)
+- If validation fails: fix issues, validate again, then commit fixes
+- **After commit:** Do NOT run validate again (linter may auto-fix imports, creating extra commits)
+- If linter auto-fixed files after commit, amend the commit you just made to include the lint fixes -->
+
+### Testing Workflow
+
+<!-- - **Before asking user to test:** ALWAYS run `npm run validate` with `required_permissions: ['all']`
+- Must pass with 0 errors and 0 warnings before user testing -->
+- Fix ALL linting errors and warnings before presenting code for testing
+- Use `--fix` option where applicable to auto-fix style issues
+
+<!-- ### Progress Tracking
+
+- After completing a phase (or significant tasks within a phase), update and check off items in `/docs/PROGRESS_TRACKER.md`
+- Mark tasks as complete with checkboxes: `- [x] Task completed`
+- Progress tracker updates should be committed AFTER code commits (separate commit)
+- This helps track overall project progress and ensures nothing is missed -->
+
+### Deployment
+
+- Always prefix deploy commands with `time` to measure deployment duration
+
+### Git History
+
+- NEVER rewrite git history (no force push, no rebase on shared branches, no --amend on pushed commits)
+- Use `git revert` instead of rewriting history to undo changes
+
+### App Restarts
+
+After making code changes, inform the user if they need to restart the app, and if they need to do anything else (for example a clean npm install).
+
+<!-- **Restart REQUIRED for:**
+
+- Changes to 
+
+**Hot reload SUFFICIENT for:**
+
+- Changes to 
+
+**Tell the user:** "✅ Hot reload should work fine" OR "⚠️ You'll need to restart the dev server (Ctrl+C, then `npx expo start`)" -->
+
+### Document Generation
+
+- Check in before creating a markdown document — explain the purpose to me first
+- Create new documents in the `/docs/` folder - not in root
+- After you create a document, but before you commit, immediately review it and look for how to make it more concise without losing information
+- NEVER directly update `/docs/memory.md` — instead, suggest changes in chat
+
+### Accuracy
+
+- **NEVER** claim "this is how WhatsApp does it" or "this is the approach [app] takes" unless you have verified information
+- Don't make up implementation details about how other apps work
+
+### Version Control
+
+- All dependency versions are **PINNED**
+- Do NOT upgrade dependencies without explicit approval
+- Check package.json before installing new packages
+
+<!-- ## Architecture Guidelines
+
+### Navigation
+
+- Use **thing**
+
+### State Management
+
+- Zustand for  -->
+
+## Documentation
+
+Refer to `/docs/architecture.md` to understand what's already built
