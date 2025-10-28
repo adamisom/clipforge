@@ -285,11 +285,20 @@ ipcMain.handle('export-video', async (event, { sourcePath, outputPath, trimStart
 ```typescript
 // Exposed to renderer
 const api = {
+  // Invoke methods (request-response)
   selectVideoFile: () => ipcRenderer.invoke('select-video-file'),
   getVideoMetadata: (path: string) => ipcRenderer.invoke('get-video-metadata', path),
   exportVideo: (src, dest, start, dur) => 
     ipcRenderer.invoke('export-video', { sourcePath: src, outputPath: dest, trimStart: start, duration: dur }),
-  selectSavePath: () => ipcRenderer.invoke('select-save-path')
+  selectSavePath: () => ipcRenderer.invoke('select-save-path'),
+  
+  // Event listeners (one-way events)
+  onExportProgress: (callback) => ipcRenderer.on('export-progress', callback),
+  onExportComplete: (callback) => ipcRenderer.on('export-complete', callback),
+  onExportError: (callback) => ipcRenderer.on('export-error', callback),
+  onMenuImport: (callback) => ipcRenderer.on('menu-import', callback),
+  onMenuExport: (callback) => ipcRenderer.on('menu-export', callback),
+  removeAllListeners: (channel) => ipcRenderer.removeAllListeners(channel)
 };
 
 contextBridge.exposeInMainWorld('api', api);
@@ -302,6 +311,7 @@ contextBridge.exposeInMainWorld('api', api);
 declare global {
   interface Window {
     api: {
+      // Invoke methods (request-response)
       selectVideoFile: () => Promise<string | null>;
       getVideoMetadata: (path: string) => Promise<{
         duration: number;
@@ -312,6 +322,14 @@ declare global {
       }>;
       exportVideo: (src: string, dest: string, start: number, dur: number) => Promise<void>;
       selectSavePath: () => Promise<string | null>;
+      
+      // Event listeners (one-way events)
+      onExportProgress: (callback: (event: any, progress: any) => void) => void;
+      onExportComplete: (callback: (event: any) => void) => void;
+      onExportError: (callback: (event: any, error: { message: string }) => void) => void;
+      onMenuImport: (callback: (event: any) => void) => void;
+      onMenuExport: (callback: (event: any) => void) => void;
+      removeAllListeners: (channel: string) => void;
     };
   }
 }
@@ -346,40 +364,41 @@ Menu.setApplicationMenu(menu);
 ```typescript
 // Renderer listeners
 useEffect(() => {
-  window.electron.ipcRenderer.on('menu-import', handleImport);
-  window.electron.ipcRenderer.on('menu-export', handleExport);
+  window.api.onMenuImport(handleImport);
+  window.api.onMenuExport(handleExport);
   
   return () => {
-    window.electron.ipcRenderer.removeAllListeners('menu-import');
-    window.electron.ipcRenderer.removeAllListeners('menu-export');
+    window.api.removeAllListeners('menu-import');
+    window.api.removeAllListeners('menu-export');
   };
 }, []);
 
 // Also listen to export events
 useEffect(() => {
-  window.electron.ipcRenderer.on('export-progress', (event, progress) => {
+  window.api.onExportProgress((event, progress) => {
     setExportProgress(progress.percent);
   });
   
-  window.electron.ipcRenderer.on('export-complete', () => {
+  window.api.onExportComplete(() => {
     // Show success
   });
   
-  window.electron.ipcRenderer.on('export-error', (event, { message }) => {
+  window.api.onExportError((event, { message }) => {
     // Show error
   });
   
   return () => {
-    window.electron.ipcRenderer.removeAllListeners('export-progress');
-    window.electron.ipcRenderer.removeAllListeners('export-complete');
-    window.electron.ipcRenderer.removeAllListeners('export-error');
+    window.api.removeAllListeners('export-progress');
+    window.api.removeAllListeners('export-complete');
+    window.api.removeAllListeners('export-error');
   };
 }, []);
 ```
 
 **Key Pattern**: 
-- **Synchronous operations**: Use `ipcRenderer.invoke()` for request-response
-- **Event notifications**: Use `webContents.send()` + `ipcRenderer.on()` for one-way events
+- **Synchronous operations**: Use `window.api.methodName()` for request-response
+- **Event notifications**: Use `window.api.onEventName()` for one-way events
+- All IPC access goes through controlled preload API (never direct `ipcRenderer`)
 - Main process never needs renderer state
 
 ---
@@ -609,10 +628,10 @@ useEffect(() => {
     // Show error modal
   };
   
-  window.electron.ipcRenderer.on('export-error', handleExportError);
+  window.api.onExportError(handleExportError);
   
   return () => {
-    window.electron.ipcRenderer.removeAllListeners('export-error');
+    window.api.removeAllListeners('export-error');
   };
 }, []);
 ```

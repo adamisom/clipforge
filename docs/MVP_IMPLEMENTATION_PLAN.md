@@ -167,11 +167,20 @@ interface VideoState {
 - [ ] Update `src/preload/index.ts`:
   ```typescript
   const api = {
+    // Invoke methods (request-response)
     selectVideoFile: () => ipcRenderer.invoke('select-video-file'),
     getVideoMetadata: (path: string) => ipcRenderer.invoke('get-video-metadata', path),
     exportVideo: (sourcePath: string, outputPath: string, trimStart: number, duration: number) => 
       ipcRenderer.invoke('export-video', { sourcePath, outputPath, trimStart, duration }),
-    selectSavePath: () => ipcRenderer.invoke('select-save-path')
+    selectSavePath: () => ipcRenderer.invoke('select-save-path'),
+    
+    // Event listeners (one-way events)
+    onExportProgress: (callback) => ipcRenderer.on('export-progress', callback),
+    onExportComplete: (callback) => ipcRenderer.on('export-complete', callback),
+    onExportError: (callback) => ipcRenderer.on('export-error', callback),
+    onMenuImport: (callback) => ipcRenderer.on('menu-import', callback),
+    onMenuExport: (callback) => ipcRenderer.on('menu-export', callback),
+    removeAllListeners: (channel) => ipcRenderer.removeAllListeners(channel)
   };
   
   contextBridge.exposeInMainWorld('api', api);
@@ -181,10 +190,19 @@ interface VideoState {
   ```typescript
   interface Window {
     api: {
+      // Invoke methods (request-response)
       selectVideoFile: () => Promise<string | null>;
       getVideoMetadata: (path: string) => Promise<any>;
       exportVideo: (src: string, dest: string, start: number, dur: number) => Promise<void>;
       selectSavePath: () => Promise<string | null>;
+      
+      // Event listeners (one-way events)
+      onExportProgress: (callback: (event: any, progress: any) => void) => void;
+      onExportComplete: (callback: (event: any) => void) => void;
+      onExportError: (callback: (event: any, error: { message: string }) => void) => void;
+      onMenuImport: (callback: (event: any) => void) => void;
+      onMenuExport: (callback: (event: any) => void) => void;
+      removeAllListeners: (channel: string) => void;
     };
   }
   ```
@@ -1026,14 +1044,14 @@ interface VideoState {
       // Show error message
     };
     
-    window.electron.ipcRenderer.on('export-progress', handleProgress);
-    window.electron.ipcRenderer.on('export-complete', handleComplete);
-    window.electron.ipcRenderer.on('export-error', handleError);
+    window.api.onExportProgress(handleProgress);
+    window.api.onExportComplete(handleComplete);
+    window.api.onExportError(handleError);
     
     return () => {
-      window.electron.ipcRenderer.removeAllListeners('export-progress');
-      window.electron.ipcRenderer.removeAllListeners('export-complete');
-      window.electron.ipcRenderer.removeAllListeners('export-error');
+      window.api.removeAllListeners('export-progress');
+      window.api.removeAllListeners('export-complete');
+      window.api.removeAllListeners('export-error');
     };
   }, []);
   ```
@@ -1087,12 +1105,12 @@ interface VideoState {
 - [ ] In renderer App component, add IPC listeners:
   ```typescript
   useEffect(() => {
-    window.electron.ipcRenderer.on('menu-import', handleImport);
-    window.electron.ipcRenderer.on('menu-export', handleExport);
+    window.api.onMenuImport(handleImport);
+    window.api.onMenuExport(handleExport);
     
     return () => {
-      window.electron.ipcRenderer.removeAllListeners('menu-import');
-      window.electron.ipcRenderer.removeAllListeners('menu-export');
+      window.api.removeAllListeners('menu-import');
+      window.api.removeAllListeners('menu-export');
     };
   }, []);
   ```
@@ -1163,10 +1181,10 @@ interface VideoState {
       alert(`Export Error: ${message}`);
     };
     
-    window.electron.ipcRenderer.on('export-error', handleExportError);
+    window.api.onExportError(handleExportError);
     
     return () => {
-      window.electron.ipcRenderer.removeAllListeners('export-error');
+      window.api.removeAllListeners('export-error');
     };
   }, []);
   ```
