@@ -1,20 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { formatTime } from '../utils/videoUtils'
 import { calculateClipPositions, isTempFile } from '../utils/clipUtils'
-
-interface TimelineClip {
-  id: string
-  sourceType: 'imported' | 'screen' | 'webcam'
-  sourcePath: string
-  sourceStartTime: number
-  sourceDuration: number
-  timelineDuration: number
-  metadata: {
-    filename: string
-    resolution: string
-    codec: string
-  }
-}
+import { TimelineClip } from '../types/timeline'
 
 interface TimelineProps {
   clips: TimelineClip[]
