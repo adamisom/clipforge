@@ -20,11 +20,23 @@ function ScreenSourcePicker({ onSelect, onCancel }: ScreenSourcePickerProps): Re
     const fetchSources = async (): Promise<void> => {
       try {
         const availableSources = await window.api.getScreenSources()
+
+        // Check if we got any sources - if not, likely permission denied
+        if (!availableSources || availableSources.length === 0) {
+          setError(
+            'Please grant Screen Recording permission in System Settings > Privacy & Security.'
+          )
+          setLoading(false)
+          return
+        }
+
         setSources(availableSources)
         setLoading(false)
       } catch (err) {
         console.error('Failed to get screen sources:', err)
-        setError('Failed to load screen sources')
+        setError(
+          'Please grant Screen Recording permission in System Settings > Privacy & Security > Screen Recording.'
+        )
         setLoading(false)
       }
     }
@@ -45,10 +57,31 @@ function ScreenSourcePicker({ onSelect, onCancel }: ScreenSourcePickerProps): Re
   if (error) {
     return (
       <div className="screen-source-picker-overlay">
-        <div className="screen-source-picker-modal">
-          <h2>Error</h2>
-          <p>{error}</p>
-          <button onClick={onCancel}>Close</button>
+        <div className="screen-source-picker-modal permission-error">
+          <div className="permission-icon">🔒</div>
+          <h2>Screen Recording Permission Required</h2>
+          <p className="error-text">{error}</p>
+          <div className="permission-steps">
+            <h3>How to grant permission:</h3>
+            <ol>
+              <li>
+                Open <strong>System Settings</strong>
+              </li>
+              <li>
+                Go to <strong>Privacy & Security</strong>
+              </li>
+              <li>
+                Click <strong>Screen Recording</strong>
+              </li>
+              <li>
+                Enable <strong>ClipForge</strong> (or your app name)
+              </li>
+              <li>Restart ClipForge</li>
+            </ol>
+          </div>
+          <button onClick={onCancel} className="primary-button">
+            Close
+          </button>
         </div>
       </div>
     )
