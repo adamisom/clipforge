@@ -4,6 +4,9 @@ import Timeline from './components/Timeline'
 import VideoPreview from './components/VideoPreview'
 import ExportButton from './components/ExportButton'
 
+// Feature flags
+const ENABLE_DRAG_AND_DROP = false
+
 // Type definitions
 interface VideoState {
   sourcePath: string | null
@@ -30,7 +33,7 @@ function WelcomeScreen({
     <div className={`welcome-screen ${isDragging ? 'drag-over' : ''}`}>
       <h1>ClipForge</h1>
       <p>Import a video to get started</p>
-      <p className="drag-hint">or drag and drop a video file here</p>
+      {ENABLE_DRAG_AND_DROP && <p className="drag-hint">or drag and drop a video file here</p>}
       <button onClick={onImport} className="import-button">
         Import Video
       </button>
@@ -259,9 +262,9 @@ function App(): React.JSX.Element {
 
   return (
     <div
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
+      onDragOver={ENABLE_DRAG_AND_DROP ? handleDragOver : undefined}
+      onDragLeave={ENABLE_DRAG_AND_DROP ? handleDragLeave : undefined}
+      onDrop={ENABLE_DRAG_AND_DROP ? handleDrop : undefined}
       style={{ width: '100%', height: '100vh' }}
     >
       {!videoState.sourcePath ? (
