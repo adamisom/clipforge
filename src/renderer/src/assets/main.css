@@ -618,3 +618,66 @@ body {
   margin-top: 20px;
   font-size: 18px;
 }
+
+/* Recording overlay (shown when recording is active) */
+.recording-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.95);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10000;
+}
+
+.recording-indicator-box {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 32px 48px;
+  text-align: center;
+  backdrop-filter: blur(10px);
+}
+
+.recording-indicator-box .recording-dot {
+  width: 16px;
+  height: 16px;
+  background: #ff3b30;
+  border-radius: 50%;
+  margin: 0 auto 16px;
+  animation: recording-pulse 1.5s infinite;
+}
+
+@keyframes recording-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.1);
+  }
+}
+
+.recording-indicator-box p {
+  color: white;
+  margin: 8px 0;
+  font-size: 16px;
+}
+
+.recording-indicator-box .recording-hint {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
+  margin-top: 16px;
+}
+
+.recording-indicator-box kbd {
+  background: rgba(255, 255, 255, 0.2);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 12px;
+}

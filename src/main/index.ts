@@ -1,4 +1,14 @@
-import { app, shell, BrowserWindow, ipcMain, dialog, Menu, desktopCapturer } from 'electron'
+import {
+  app,
+  shell,
+  BrowserWindow,
+  ipcMain,
+  dialog,
+  Menu,
+  desktopCapturer,
+  Notification,
+  globalShortcut
+} from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
@@ -11,7 +21,6 @@ import {
   getTempRecordingPath,
   checkTempDirSize
 } from './utils/tempFileManager'
-import { createFloatingRecorder, closeFloatingRecorder } from './floatingRecorder'
 
 // Set up FFmpeg and FFprobe binary paths (dev vs production)
 const ffmpegPath = app.isPackaged ? join(process.resourcesPath, 'ffmpeg') : ffmpegInstaller.path
@@ -30,6 +39,10 @@ if (!fs.existsSync(ffprobePath)) {
   ffmpeg.setFfprobePath(ffprobePath)
   console.log('FFprobe path set to:', ffprobePath)
 }
+
+// Track recording state
+let isRecording = false
+let recordingNotification: Notification | null = null
 
 function createWindow(): void {
   // Create the browser window.
@@ -215,28 +228,70 @@ app.whenReady().then(async () => {
     }))
   })
 
-  // Start floating recorder
-  ipcMain.handle('start-floating-recorder', () => {
-    createFloatingRecorder()
-    const mainWindow = BrowserWindow.getAllWindows().find((w) => !w.isAlwaysOnTop())
-    if (mainWindow) mainWindow.minimize()
+  // Start recording - minimize window, show notification, register shortcut
+  ipcMain.handle('start-recording', () => {
+    const mainWindow = BrowserWindow.getAllWindows()[0]
+    if (mainWindow) {
+      mainWindow.minimize()
+    }
+
+    isRecording = true
+
+    // Register global shortcut to stop recording
+    const ret = globalShortcut.register('CommandOrControl+Shift+S', () => {
+      console.log('Stop recording shortcut pressed')
+      if (isRecording && mainWindow) {
+        mainWindow.webContents.send('stop-recording')
+      }
+    })
+
+    if (!ret) {
+      console.error('Failed to register shortcut')
+    }
+
+    // Show notification with action
+    recordingNotification = new Notification({
+      title: 'Recording in Progress',
+      body: 'Press Cmd+Shift+S to stop, or click Stop below',
+      silent: true,
+      actions: [{ type: 'button', text: 'Stop Recording' }]
+    })
+
+    recordingNotification.on('action', () => {
+      console.log('Stop recording from notification')
+      if (isRecording && mainWindow) {
+        mainWindow.webContents.send('stop-recording')
+      }
+    })
+
+    recordingNotification.on('click', () => {
+      console.log('Notification clicked')
+      if (isRecording && mainWindow) {
+        mainWindow.webContents.send('stop-recording')
+      }
+    })
+
+    recordingNotification.show()
   })
 
-  // Stop floating recorder
-  ipcMain.handle('stop-floating-recorder', () => {
-    closeFloatingRecorder()
-    const mainWindow = BrowserWindow.getAllWindows().find((w) => !w.isAlwaysOnTop())
+  // Stop recording - cleanup
+  ipcMain.handle('stop-recording', () => {
+    isRecording = false
+
+    // Unregister shortcut
+    globalShortcut.unregister('CommandOrControl+Shift+S')
+
+    // Close notification
+    if (recordingNotification) {
+      recordingNotification.close()
+      recordingNotification = null
+    }
+
+    // Restore window
+    const mainWindow = BrowserWindow.getAllWindows()[0]
     if (mainWindow) {
       mainWindow.restore()
       mainWindow.focus()
-    }
-  })
-
-  // Stop recording from floating window
-  ipcMain.handle('stop-recording-from-floating', () => {
-    const mainWindow = BrowserWindow.getAllWindows().find((w) => !w.isAlwaysOnTop())
-    if (mainWindow) {
-      mainWindow.webContents.send('stop-recording')
     }
   })
 

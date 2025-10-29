@@ -24,9 +24,8 @@ declare global {
       saveRecordingBlob: (arrayBuffer: ArrayBuffer) => Promise<string>
       saveRecordingPermanent: (tempPath: string) => Promise<{ saved: boolean; path: string }>
       getScreenSources: () => Promise<Array<{ id: string; name: string; thumbnail: string }>>
-      startFloatingRecorder: () => Promise<void>
-      stopFloatingRecorder: () => Promise<void>
-      stopRecordingFromFloating: () => Promise<void>
+      startRecording: () => Promise<void>
+      stopRecording: () => Promise<void>
       onStopRecording: (callback: () => void) => void
 
       // Event listeners (one-way events)

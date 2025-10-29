@@ -14,9 +14,8 @@ const api = {
   saveRecordingPermanent: (tempPath: string) =>
     ipcRenderer.invoke('save-recording-permanent', tempPath),
   getScreenSources: () => ipcRenderer.invoke('get-screen-sources'),
-  startFloatingRecorder: () => ipcRenderer.invoke('start-floating-recorder'),
-  stopFloatingRecorder: () => ipcRenderer.invoke('stop-floating-recorder'),
-  stopRecordingFromFloating: () => ipcRenderer.invoke('stop-recording-from-floating'),
+  startRecording: () => ipcRenderer.invoke('start-recording'),
+  stopRecording: () => ipcRenderer.invoke('stop-recording'),
   onStopRecording: (callback) => ipcRenderer.on('stop-recording', callback),
 
   // Event listeners (one-way events)
