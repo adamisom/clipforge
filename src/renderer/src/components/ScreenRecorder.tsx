@@ -14,25 +14,20 @@ function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
 
-  const handleSourceSelect = async (sourceId: string): Promise<void> => {
+  const handleSourceSelect = async (): Promise<void> => {
     try {
-      // Electron's desktopCapturer requires non-standard constraints format
-      const constraints = {
-        audio: {
-          mandatory: {
-            chromeMediaSource: 'desktop',
-            chromeMediaSourceId: sourceId
-          }
-        },
-        video: {
-          mandatory: {
-            chromeMediaSource: 'desktop',
-            chromeMediaSourceId: sourceId
-          }
-        }
-      } as unknown as MediaStreamConstraints
+      // Use getDisplayMedia instead of desktopCapturer + getUserMedia
+      // This is more reliable for screen recording in Electron
+      console.log('Requesting screen capture via getDisplayMedia...')
 
-      const mediaStream = await navigator.mediaDevices.getUserMedia(constraints)
+      const mediaStream = await navigator.mediaDevices.getDisplayMedia({
+        audio: false, // Disable audio for now
+        video: {
+          cursor: 'always'
+        }
+      } as MediaStreamConstraints)
+
+      console.log('Media stream obtained:', mediaStream)
       setStream(mediaStream)
 
       setStage('countdown')
@@ -50,7 +45,9 @@ function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): 
       }, 1000)
     } catch (err) {
       console.error('Screen recording error:', err)
-      alert('Failed to start screen recording')
+      alert(
+        'Failed to start screen recording: ' + (err instanceof Error ? err.message : String(err))
+      )
       onClose()
     }
   }
@@ -74,34 +71,30 @@ function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): 
       })
 
       if (videoTracks.length === 0) {
+        console.error('No video track available')
         alert('No video track available')
         await window.api.stopRecording()
         onClose()
         return
       }
 
-      // Try different codec options in order of preference
-      let options: MediaRecorderOptions | undefined
-      const codecs = [
-        { mimeType: 'video/webm' }, // Let browser choose codec
-        { mimeType: 'video/webm;codecs=vp8' },
-        { mimeType: 'video/webm;codecs=h264' }
+      // Log all supported mimetypes
+      const testTypes = [
+        'video/webm',
+        'video/webm;codecs=vp8',
+        'video/webm;codecs=vp9',
+        'video/webm;codecs=h264',
+        'video/webm;codecs=vp8,opus',
+        'video/mp4'
       ]
+      console.log('Supported mimetypes:')
+      testTypes.forEach((type) => {
+        console.log(`  ${type}: ${MediaRecorder.isTypeSupported(type)}`)
+      })
 
-      for (const codec of codecs) {
-        if (MediaRecorder.isTypeSupported(codec.mimeType)) {
-          options = codec
-          console.log('Using codec:', codec.mimeType)
-          break
-        }
-      }
-
-      if (!options) {
-        console.warn('No preferred codec supported, using default')
-        options = {}
-      }
-
-      const mediaRecorder = new MediaRecorder(mediaStream, options)
+      // Use the absolute simplest configuration
+      console.log('Creating MediaRecorder with NO options (let browser decide everything)...')
+      const mediaRecorder = new MediaRecorder(mediaStream) // No options at all!
 
       mediaRecorder.ondataavailable = (event) => {
         console.log(
@@ -137,8 +130,7 @@ function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): 
         })
         // Ensure we have data
         if (chunksRef.current.length === 0) {
-          console.error('No recording data available')
-          alert('Recording failed: No data captured')
+          console.error('No recording data available after stop')
           await window.api.stopRecording()
           onClose()
           return
@@ -149,7 +141,6 @@ function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): 
         // Verify blob has content
         if (blob.size === 0) {
           console.error('Recording blob is empty')
-          alert('Recording failed: File is empty')
           await window.api.stopRecording()
           onClose()
           return
@@ -161,9 +152,10 @@ function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): 
       }
 
       mediaRecorder.onerror = (event) => {
-        console.error('MediaRecorder error:', event)
-        console.error('MediaRecorder state on error:', mediaRecorder.state)
-        alert('Recording error occurred')
+        console.error('MediaRecorder error event:', event)
+        if (event.error) {
+          console.error('Error details:', event.error)
+        }
       }
 
       console.log('Starting MediaRecorder...')
@@ -176,12 +168,12 @@ function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): 
 
       // Check state after a brief moment
       setTimeout(() => {
-        console.log('MediaRecorder state after 100ms:', mediaRecorder.state)
+        console.log('MediaRecorder state after 200ms:', mediaRecorder.state)
         if (mediaRecorder.state === 'inactive') {
-          console.error('MediaRecorder failed to start - still inactive!')
-          alert('Recording failed to start. MediaRecorder went inactive immediately.')
+          console.error('CRITICAL: MediaRecorder failed to start - still inactive after 200ms!')
+          console.error('This usually means the codec/stream combination is not supported')
         }
-      }, 100)
+      }, 200)
 
       mediaRecorderRef.current = mediaRecorder
       setStage('recording')
