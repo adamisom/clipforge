@@ -54,29 +54,42 @@ function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): 
     }
   }
 
-  const handleStartRecording = (): void => {
-    setStage('countdown')
-    setCountdown(3)
+  const handleStartRecording = async (): Promise<void> => {
+    try {
+      // Close the ready dialog and minimize window FIRST
+      onClose()
 
-    const countdownInterval = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev === null || prev <= 1) {
-          clearInterval(countdownInterval)
-          if (streamRef.current) {
-            beginRecording(streamRef.current)
+      // Minimize window, show notification, register shortcut
+      await window.api.startRecording()
+
+      // Small delay to ensure window is minimized
+      await new Promise((resolve) => setTimeout(resolve, 300))
+
+      // Now do countdown (won't be visible in recording since window is minimized)
+      setStage('countdown')
+      setCountdown(3)
+
+      const countdownInterval = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev === null || prev <= 1) {
+            clearInterval(countdownInterval)
+            if (streamRef.current) {
+              beginRecording(streamRef.current)
+            }
+            return null
           }
-          return null
-        }
-        return prev - 1
-      })
-    }, 1000)
+          return prev - 1
+        })
+      }, 1000)
+    } catch (err) {
+      console.error('Failed to start recording:', err)
+      alert('Failed to start recording: ' + (err instanceof Error ? err.message : String(err)))
+      onClose()
+    }
   }
 
   const beginRecording = async (mediaStream: MediaStream): Promise<void> => {
     try {
-      // Minimize window, show notification, register shortcut
-      await window.api.startRecording()
-
       // Reset chunks array
       chunksRef.current = []
 
