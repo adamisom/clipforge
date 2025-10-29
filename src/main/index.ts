@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, ipcMain, dialog, Menu } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, dialog, Menu, desktopCapturer } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
@@ -6,6 +6,8 @@ import ffmpeg from 'fluent-ffmpeg'
 import ffmpegInstaller from '@ffmpeg-installer/ffmpeg'
 import ffprobeInstaller from '@ffprobe-installer/ffprobe'
 import fs from 'fs'
+import { initializeOnAppStart, getTempRecordingPath, checkTempDirSize, isTempFile } from './utils/tempFileManager'
+import { createFloatingRecorder, closeFloatingRecorder } from './floatingRecorder'
 
 // Set up FFmpeg and FFprobe binary paths (dev vs production)
 const ffmpegPath = app.isPackaged ? join(process.resourcesPath, 'ffmpeg') : ffmpegInstaller.path
@@ -64,7 +66,9 @@ function createWindow(): void {
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  await initializeOnAppStart([])
+
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.electron')
 
@@ -147,6 +151,90 @@ app.whenReady().then(() => {
       })
     }
   )
+
+  // Save recording blob to temp
+  ipcMain.handle('save-recording-blob', async (_event, arrayBuffer: ArrayBuffer) => {
+    try {
+      const size = await checkTempDirSize()
+      const MAX_SIZE = 5 * 1024 * 1024 * 1024
+
+      if (size + arrayBuffer.byteLength > MAX_SIZE) {
+        throw new Error('Temp directory size limit exceeded. Please save existing recordings.')
+      }
+
+      const tempPath = getTempRecordingPath()
+      const buffer = Buffer.from(arrayBuffer)
+
+      await fs.promises.writeFile(tempPath, buffer)
+      console.log('Recording saved to temp:', tempPath)
+
+      return tempPath
+    } catch (err) {
+      console.error('Error saving recording:', err)
+      throw err
+    }
+  })
+
+  // Save recording to permanent location
+  ipcMain.handle('save-recording-permanent', async (_event, tempPath: string) => {
+    const timestamp = new Date().toISOString().replace(/:/g, '-').split('.')[0]
+    const result = await dialog.showSaveDialog({
+      defaultPath: `clipforge-recording-${timestamp}.webm`,
+      filters: [{ name: 'WebM Video', extensions: ['webm'] }]
+    })
+
+    if (result.canceled || !result.filePath) {
+      return { saved: false, path: tempPath }
+    }
+
+    try {
+      await fs.promises.copyFile(tempPath, result.filePath)
+      await fs.promises.unlink(tempPath)
+      return { saved: true, path: result.filePath }
+    } catch (err) {
+      console.error('Error moving recording:', err)
+      throw err
+    }
+  })
+
+  // Get screen sources for recording
+  ipcMain.handle('get-screen-sources', async () => {
+    const sources = await desktopCapturer.getSources({
+      types: ['screen', 'window'],
+      thumbnailSize: { width: 300, height: 200 }
+    })
+
+    return sources.map((source) => ({
+      id: source.id,
+      name: source.name,
+      thumbnail: source.thumbnail.toDataURL()
+    }))
+  })
+
+  // Start floating recorder
+  ipcMain.handle('start-floating-recorder', () => {
+    createFloatingRecorder()
+    const mainWindow = BrowserWindow.getAllWindows().find((w) => !w.isAlwaysOnTop())
+    if (mainWindow) mainWindow.minimize()
+  })
+
+  // Stop floating recorder
+  ipcMain.handle('stop-floating-recorder', () => {
+    closeFloatingRecorder()
+    const mainWindow = BrowserWindow.getAllWindows().find((w) => !w.isAlwaysOnTop())
+    if (mainWindow) {
+      mainWindow.restore()
+      mainWindow.focus()
+    }
+  })
+
+  // Stop recording from floating window
+  ipcMain.handle('stop-recording-from-floating', () => {
+    const mainWindow = BrowserWindow.getAllWindows().find((w) => !w.isAlwaysOnTop())
+    if (mainWindow) {
+      mainWindow.webContents.send('stop-recording')
+    }
+  })
 
   // Setup application menu
   const mainWindow = BrowserWindow.getAllWindows()[0]

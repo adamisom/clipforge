@@ -3,22 +3,16 @@ import './assets/main.css'
 import Timeline from './components/Timeline'
 import VideoPreview from './components/VideoPreview'
 import ExportButton from './components/ExportButton'
+import WebcamRecorder from './components/WebcamRecorder'
+import ScreenRecorder from './components/ScreenRecorder'
+import { TimelineClip } from './types/timeline'
 
 // Feature flags
 const ENABLE_DRAG_AND_DROP = false
 
-// Type definitions
-interface VideoState {
-  sourcePath: string | null
-  duration: number
-  trimStart: number
-  trimEnd: number
-  playheadPosition: number
-  isPlaying: boolean
-  metadata: {
-    filename: string
-    resolution: string
-  }
+// Helper to generate unique clip IDs
+const generateClipId = (): string => {
+  return `clip-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 }
 
 // Components will be defined inline for now
@@ -42,60 +36,70 @@ function WelcomeScreen({
 }
 
 function VideoEditor({
-  videoState,
-  setVideoState
+  clips,
+  setClips,
+  playheadPosition,
+  setPlayheadPosition,
+  isPlaying,
+  setIsPlaying
 }: {
-  videoState: VideoState
-  setVideoState: React.Dispatch<React.SetStateAction<VideoState>>
+  clips: TimelineClip[]
+  setClips: React.Dispatch<React.SetStateAction<TimelineClip[]>>
+  playheadPosition: number
+  setPlayheadPosition: (pos: number) => void
+  isPlaying: boolean
+  setIsPlaying: (playing: boolean) => void
 }): React.JSX.Element {
+  // For now, just show first clip
+  const currentClip = clips[0]
+  const totalDuration = clips.reduce((sum, c) => sum + c.timelineDuration, 0)
+
   const handlePlayPause = (): void => {
-    setVideoState((prev) => ({ ...prev, isPlaying: !prev.isPlaying }))
+    setIsPlaying(!isPlaying)
   }
 
   const handleTimeUpdate = (time: number): void => {
-    setVideoState((prev) => ({ ...prev, playheadPosition: time }))
+    setPlayheadPosition(time)
   }
 
   const handleTrimChange = (newTrimStart: number, newTrimEnd: number): void => {
-    setVideoState((prev) => ({
-      ...prev,
-      trimStart: newTrimStart,
-      trimEnd: newTrimEnd,
-      // Reset playhead if it's outside new trim range
-      playheadPosition: Math.min(prev.playheadPosition, newTrimEnd - newTrimStart)
-    }))
+    setClips((prevClips) =>
+      prevClips.map((clip, index) =>
+        index === 0
+          ? {
+              ...clip,
+              sourceStartTime: newTrimStart,
+              timelineDuration: newTrimEnd - newTrimStart
+            }
+          : clip
+      )
+    )
   }
 
   const handlePlayheadChange = (position: number): void => {
-    setVideoState((prev) => ({ ...prev, playheadPosition: position, isPlaying: false }))
+    setPlayheadPosition(position)
+    setIsPlaying(false)
   }
 
   const handleExport = useCallback(async (): Promise<void> => {
-    try {
-      // Get output path from user
-      const outputPath = await window.api.selectSavePath()
-      if (!outputPath) return
+    if (clips.length === 0) return
 
-      // Calculate trim duration
-      const duration = videoState.trimEnd - videoState.trimStart
+    const outputPath = await window.api.selectSavePath()
+    if (!outputPath) return
 
-      // Start export
-      await window.api.exportVideo(
-        videoState.sourcePath!,
-        outputPath,
-        videoState.trimStart,
-        duration
-      )
-    } catch (error) {
-      console.error('Export failed:', error)
-      alert(`Export failed: ${error}`)
-    }
-  }, [videoState.sourcePath, videoState.trimStart, videoState.trimEnd])
+    // For now, export first clip only
+    await window.api.exportVideo(
+      currentClip.sourcePath,
+      outputPath,
+      currentClip.sourceStartTime,
+      currentClip.timelineDuration
+    )
+  }, [clips, currentClip])
 
   // Listen for menu events
   useEffect(() => {
     const handleMenuExport = (): void => {
-      if (videoState.sourcePath) {
+      if (clips.length > 0) {
         handleExport()
       }
     }
@@ -105,68 +109,141 @@ function VideoEditor({
     return () => {
       window.api.removeAllListeners('menu-export')
     }
-  }, [videoState.sourcePath, handleExport])
+  }, [clips, handleExport])
 
   return (
     <div className="video-editor">
       <div className="preview-panel">
-        <VideoPreview
-          sourcePath={videoState.sourcePath}
-          trimStart={videoState.trimStart}
-          trimEnd={videoState.trimEnd}
-          playheadPosition={videoState.playheadPosition}
-          isPlaying={videoState.isPlaying}
-          onPlayPause={handlePlayPause}
-          onTimeUpdate={handleTimeUpdate}
-        />
+        {currentClip ? (
+          <VideoPreview
+            sourcePath={currentClip.sourcePath}
+            trimStart={currentClip.sourceStartTime}
+            trimEnd={currentClip.sourceStartTime + currentClip.timelineDuration}
+            playheadPosition={playheadPosition}
+            isPlaying={isPlaying}
+            onPlayPause={handlePlayPause}
+            onTimeUpdate={handleTimeUpdate}
+          />
+        ) : null}
       </div>
+
+      {/* Temporarily pass first clip data to Timeline */}
       <Timeline
-        duration={videoState.duration}
-        trimStart={videoState.trimStart}
-        trimEnd={videoState.trimEnd}
-        playheadPosition={videoState.playheadPosition}
+        duration={totalDuration}
+        trimStart={currentClip ? currentClip.sourceStartTime : 0}
+        trimEnd={currentClip ? currentClip.sourceStartTime + currentClip.timelineDuration : 0}
+        playheadPosition={playheadPosition}
         onTrimChange={handleTrimChange}
         onPlayheadChange={handlePlayheadChange}
       />
+
       <div className="info-panel">
         <div className="info-content">
           <h3>Video Info</h3>
           <div className="info-item">
-            <strong>File:</strong> {videoState.metadata.filename}
+            <strong>Clips:</strong> {clips.length}
           </div>
-          <div className="info-item">
-            <strong>Resolution:</strong> {videoState.metadata.resolution}
-          </div>
-          <div className="info-item">
-            <strong>Duration:</strong> {Math.floor(videoState.duration)}s
-          </div>
-          <div className="info-item">
-            <strong>Trim:</strong> {Math.floor(videoState.trimStart)}s -{' '}
-            {Math.floor(videoState.trimEnd)}s
-          </div>
+          {currentClip && (
+            <>
+              <div className="info-item">
+                <strong>File:</strong> {currentClip.metadata.filename}
+              </div>
+              <div className="info-item">
+                <strong>Resolution:</strong> {currentClip.metadata.resolution}
+              </div>
+              <div className="info-item">
+                <strong>Duration:</strong> {Math.floor(currentClip.sourceDuration)}s
+              </div>
+              <div className="info-item">
+                <strong>Trim:</strong> {Math.floor(currentClip.sourceStartTime)}s -{' '}
+                {Math.floor(currentClip.sourceStartTime + currentClip.timelineDuration)}s
+              </div>
+            </>
+          )}
         </div>
-        <ExportButton
-          sourcePath={videoState.sourcePath}
-          trimStart={videoState.trimStart}
-          trimEnd={videoState.trimEnd}
-          onExport={handleExport}
-        />
+
+        <ExportButton hasClips={clips.length > 0} onExport={handleExport} />
       </div>
     </div>
   )
 }
 
 function App(): React.JSX.Element {
-  const [videoState, setVideoState] = useState<VideoState>({
-    sourcePath: null,
-    duration: 0,
-    trimStart: 0,
-    trimEnd: 0,
-    playheadPosition: 0,
-    isPlaying: false,
-    metadata: { filename: '', resolution: '' }
-  })
+  // NEW multi-clip state
+  const [clips, setClips] = useState<TimelineClip[]>([])
+  const [playheadPosition, setPlayheadPosition] = useState(0)
+  const [isPlaying, setIsPlaying] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
+  const [showWebcamRecorder, setShowWebcamRecorder] = useState(false)
+  const [showScreenRecorder, setShowScreenRecorder] = useState(false)
+
+  const totalDuration = clips.reduce((sum, clip) => sum + clip.timelineDuration, 0)
+
+  const handleWebcamRecordingComplete = async (blob: Blob): Promise<void> => {
+    try {
+      const arrayBuffer = await blob.arrayBuffer()
+      const tempPath = await window.api.saveRecordingBlob(arrayBuffer)
+
+      const result = await window.api.saveRecordingPermanent(tempPath)
+      const finalPath = result.path
+
+      const metadata = await window.api.getVideoMetadata(finalPath)
+
+      const newClip: TimelineClip = {
+        id: generateClipId(),
+        sourceType: 'webcam',
+        sourcePath: finalPath,
+        sourceStartTime: 0,
+        sourceDuration: metadata.duration,
+        timelineDuration: metadata.duration,
+        metadata: {
+          filename: metadata.filename,
+          resolution: `${metadata.width}x${metadata.height}`,
+          codec: metadata.codec
+        }
+      }
+
+      setClips((prev) => [...prev, newClip])
+      setShowWebcamRecorder(false)
+    } catch (error) {
+      console.error('Failed to save recording:', error)
+      alert(`Failed to save recording: ${error}`)
+      setShowWebcamRecorder(false)
+    }
+  }
+
+  const handleScreenRecordingComplete = async (blob: Blob): Promise<void> => {
+    try {
+      const arrayBuffer = await blob.arrayBuffer()
+      const tempPath = await window.api.saveRecordingBlob(arrayBuffer)
+
+      const result = await window.api.saveRecordingPermanent(tempPath)
+      const finalPath = result.path
+
+      const metadata = await window.api.getVideoMetadata(finalPath)
+
+      const newClip: TimelineClip = {
+        id: generateClipId(),
+        sourceType: 'screen',
+        sourcePath: finalPath,
+        sourceStartTime: 0,
+        sourceDuration: metadata.duration,
+        timelineDuration: metadata.duration,
+        metadata: {
+          filename: metadata.filename,
+          resolution: `${metadata.width}x${metadata.height}`,
+          codec: metadata.codec
+        }
+      }
+
+      setClips((prev) => [...prev, newClip])
+      setShowScreenRecorder(false)
+    } catch (error) {
+      console.error('Failed to save screen recording:', error)
+      alert(`Failed to save recording: ${error}`)
+      setShowScreenRecorder(false)
+    }
+  }
 
   // Import handler
   const handleImport = useCallback(async (): Promise<void> => {
@@ -177,19 +254,21 @@ function App(): React.JSX.Element {
       // Get metadata
       const metadata = await window.api.getVideoMetadata(filePath)
 
-      // Update state
-      setVideoState({
+      const newClip: TimelineClip = {
+        id: generateClipId(),
+        sourceType: 'imported',
         sourcePath: filePath,
-        duration: metadata.duration,
-        trimStart: 0,
-        trimEnd: metadata.duration,
-        playheadPosition: 0,
-        isPlaying: false,
+        sourceStartTime: 0,
+        sourceDuration: metadata.duration,
+        timelineDuration: metadata.duration,
         metadata: {
           filename: metadata.filename,
-          resolution: `${metadata.width}x${metadata.height}`
+          resolution: `${metadata.width}x${metadata.height}`,
+          codec: metadata.codec
         }
-      })
+      }
+
+      setClips((prev) => [...prev, newClip])
     } catch (error) {
       console.error('Import failed:', error)
       alert(`Failed to import video: ${error}`)
@@ -222,25 +301,27 @@ function App(): React.JSX.Element {
       return
     }
 
-    // Get file path (Electron provides path property)
     const filePath = (videoFiles[0] as File & { path: string }).path
     if (!filePath) return
 
-    // Call same import logic
     try {
       const metadata = await window.api.getVideoMetadata(filePath)
-      setVideoState({
+
+      const newClip: TimelineClip = {
+        id: generateClipId(),
+        sourceType: 'imported',
         sourcePath: filePath,
-        duration: metadata.duration,
-        trimStart: 0,
-        trimEnd: metadata.duration,
-        playheadPosition: 0,
-        isPlaying: false,
+        sourceStartTime: 0,
+        sourceDuration: metadata.duration,
+        timelineDuration: metadata.duration,
         metadata: {
           filename: metadata.filename,
-          resolution: `${metadata.width}x${metadata.height}`
+          resolution: `${metadata.width}x${metadata.height}`,
+          codec: metadata.codec
         }
-      })
+      }
+
+      setClips((prev) => [...prev, newClip])
     } catch (error) {
       console.error('Drag-and-drop import failed:', error)
       alert(`Failed to import video: ${error}`)
@@ -267,11 +348,68 @@ function App(): React.JSX.Element {
       onDrop={ENABLE_DRAG_AND_DROP ? handleDrop : undefined}
       style={{ width: '100%', height: '100vh' }}
     >
-      {!videoState.sourcePath ? (
+      {clips.length === 0 ? (
         <WelcomeScreen onImport={handleImport} isDragging={isDragging} />
       ) : (
-        <VideoEditor videoState={videoState} setVideoState={setVideoState} />
+        <VideoEditor
+          clips={clips}
+          setClips={setClips}
+          playheadPosition={playheadPosition}
+          setPlayheadPosition={setPlayheadPosition}
+          isPlaying={isPlaying}
+          setIsPlaying={setIsPlaying}
+        />
       )}
+
+      {showWebcamRecorder && (
+        <WebcamRecorder
+          onRecordingComplete={handleWebcamRecordingComplete}
+          onClose={() => setShowWebcamRecorder(false)}
+        />
+      )}
+
+      {showScreenRecorder && (
+        <ScreenRecorder
+          onRecordingComplete={handleScreenRecordingComplete}
+          onClose={() => setShowScreenRecorder(false)}
+        />
+      )}
+
+      {/* TEMPORARY TEST BUTTONS */}
+      <button
+        onClick={() => setShowWebcamRecorder(true)}
+        style={{
+          position: 'fixed',
+          bottom: 20,
+          right: 120,
+          zIndex: 999,
+          padding: '12px 24px',
+          background: '#646cff',
+          color: 'white',
+          border: 'none',
+          borderRadius: '8px',
+          cursor: 'pointer'
+        }}
+      >
+        Test Webcam
+      </button>
+      <button
+        onClick={() => setShowScreenRecorder(true)}
+        style={{
+          position: 'fixed',
+          bottom: 20,
+          right: 20,
+          zIndex: 999,
+          padding: '12px 24px',
+          background: '#ff6b6b',
+          color: 'white',
+          border: 'none',
+          borderRadius: '8px',
+          cursor: 'pointer'
+        }}
+      >
+        Test Screen
+      </button>
     </div>
   )
 }

@@ -9,6 +9,15 @@ const api = {
   exportVideo: (sourcePath: string, outputPath: string, trimStart: number, duration: number) =>
     ipcRenderer.invoke('export-video', { sourcePath, outputPath, trimStart, duration }),
   selectSavePath: () => ipcRenderer.invoke('select-save-path'),
+  saveRecordingBlob: (arrayBuffer: ArrayBuffer) =>
+    ipcRenderer.invoke('save-recording-blob', arrayBuffer),
+  saveRecordingPermanent: (tempPath: string) =>
+    ipcRenderer.invoke('save-recording-permanent', tempPath),
+  getScreenSources: () => ipcRenderer.invoke('get-screen-sources'),
+  startFloatingRecorder: () => ipcRenderer.invoke('start-floating-recorder'),
+  stopFloatingRecorder: () => ipcRenderer.invoke('stop-floating-recorder'),
+  stopRecordingFromFloating: () => ipcRenderer.invoke('stop-recording-from-floating'),
+  onStopRecording: (callback) => ipcRenderer.on('stop-recording', callback),
 
   // Event listeners (one-way events)
   onExportProgress: (callback: (event: IpcRendererEvent, progress: { percent: number }) => void) =>

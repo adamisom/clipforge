@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Recording</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        background: transparent;
+        -webkit-app-region: drag;
+        font-family: system-ui, -apple-system, sans-serif;
+      }
+      .floating-recorder {
+        background: rgba(0, 0, 0, 0.9);
+        border-radius: 24px;
+        padding: 12px 20px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        backdrop-filter: blur(10px);
+      }
+      .recording-indicator {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: white;
+      }
+      .recording-dot {
+        color: #ff3b30;
+        font-size: 16px;
+        animation: blink 1s infinite;
+      }
+      @keyframes blink {
+        0%,
+        50% {
+          opacity: 1;
+        }
+        51%,
+        100% {
+          opacity: 0;
+        }
+      }
+      .stop-button {
+        -webkit-app-region: no-drag;
+        background: #ff3b30;
+        color: white;
+        border: none;
+        padding: 6px 16px;
+        border-radius: 16px;
+        font-size: 13px;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="floating-recorder">
+      <div class="recording-indicator">
+        <span class="recording-dot">●</span>
+        <span id="time">0:00</span>
+      </div>
+      <button class="stop-button" onclick="stopRecording()">Stop</button>
+    </div>
+    <script>
+      let seconds = 0
+      setInterval(() => {
+        seconds++
+        const mins = Math.floor(seconds / 60)
+        const secs = seconds % 60
+        document.getElementById('time').textContent = `${mins}:${secs.toString().padStart(2, '0')}`
+      }, 1000)
+
+      function stopRecording() {
+        if (window.api && window.api.stopRecordingFromFloating) {
+          window.api.stopRecordingFromFloating()
+        } else {
+          console.error('API not available')
+        }
+      }
+    </script>
+  </body>
+</html>
+
