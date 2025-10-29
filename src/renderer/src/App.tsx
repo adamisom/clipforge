@@ -141,6 +141,63 @@ function VideoEditor({
     setIsPlaying(false)
   }
 
+  const handleSplitAtPlayhead = useCallback((): void => {
+    if (!currentClip) return
+
+    const position = clipPositions.get(currentClip.id)
+    if (!position) return
+
+    // Calculate split point relative to the clip's source video
+    const splitPoint = relativePlayheadPosition + currentClip.sourceStartTime
+
+    // Don't split if we're at the very beginning or end of the clip
+    if (
+      relativePlayheadPosition < 0.1 ||
+      relativePlayheadPosition > currentClip.timelineDuration - 0.1
+    ) {
+      return
+    }
+
+    // Create two new clips from the split
+    const firstClip: TimelineClip = {
+      ...currentClip,
+      id: generateClipId(),
+      timelineDuration: relativePlayheadPosition
+    }
+
+    const secondClip: TimelineClip = {
+      ...currentClip,
+      id: generateClipId(),
+      sourceStartTime: splitPoint,
+      timelineDuration: currentClip.timelineDuration - relativePlayheadPosition
+    }
+
+    // Replace the original clip with the two new clips
+    setClips((prevClips) => {
+      const index = prevClips.findIndex((c) => c.id === currentClip.id)
+      if (index === -1) return prevClips
+      const newClips = [...prevClips]
+      newClips.splice(index, 1, firstClip, secondClip)
+      return newClips
+    })
+  }, [currentClip, clipPositions, relativePlayheadPosition, setClips])
+
+  // Listen for Cmd+K keyboard shortcut for split
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent): void => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        handleSplitAtPlayhead()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [handleSplitAtPlayhead])
+
   const handleExport = useCallback(async (): Promise<void> => {
     if (clips.length === 0) return
 
