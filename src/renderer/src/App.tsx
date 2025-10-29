@@ -179,10 +179,20 @@ function App(): React.JSX.Element {
 
   const handleWebcamRecordingComplete = async (blob: Blob): Promise<void> => {
     try {
+      // Prevent double-calls by immediately closing the webcam recorder
+      setShowWebcamRecorder(false)
+
       const arrayBuffer = await blob.arrayBuffer()
       const tempPath = await window.api.saveRecordingBlob(arrayBuffer)
 
       const result = await window.api.saveRecordingPermanent(tempPath)
+
+      // User cancelled the save dialog
+      if (!result.saved) {
+        console.log('User cancelled save')
+        return
+      }
+
       const finalPath = result.path
 
       const metadata = await window.api.getVideoMetadata(finalPath)
@@ -202,20 +212,28 @@ function App(): React.JSX.Element {
       }
 
       setClips((prev) => [...prev, newClip])
-      setShowWebcamRecorder(false)
     } catch (error) {
       console.error('Failed to save recording:', error)
       alert(`Failed to save recording: ${error}`)
-      setShowWebcamRecorder(false)
     }
   }
 
   const handleScreenRecordingComplete = async (blob: Blob): Promise<void> => {
     try {
+      // Prevent double-calls by immediately closing the screen recorder
+      setShowScreenRecorder(false)
+
       const arrayBuffer = await blob.arrayBuffer()
       const tempPath = await window.api.saveRecordingBlob(arrayBuffer)
 
       const result = await window.api.saveRecordingPermanent(tempPath)
+
+      // User cancelled the save dialog
+      if (!result.saved) {
+        console.log('User cancelled save')
+        return
+      }
+
       const finalPath = result.path
 
       const metadata = await window.api.getVideoMetadata(finalPath)
@@ -235,11 +253,9 @@ function App(): React.JSX.Element {
       }
 
       setClips((prev) => [...prev, newClip])
-      setShowScreenRecorder(false)
     } catch (error) {
       console.error('Failed to save screen recording:', error)
       alert(`Failed to save recording: ${error}`)
-      setShowScreenRecorder(false)
     }
   }
 
