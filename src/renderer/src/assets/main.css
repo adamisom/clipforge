@@ -612,6 +612,28 @@ body {
   white-space: nowrap;
 }
 
+.picker-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 24px;
+}
+
+.picker-cancel-button {
+  padding: 12px 32px;
+  font-size: 16px;
+  background: #2a2a2a;
+  color: #ffffff;
+  border: 1px solid #444;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.picker-cancel-button:hover {
+  background: #3a3a3a;
+  border-color: #646cff;
+}
+
 /* Countdown fullscreen */
 .countdown-overlay.fullscreen {
   position: fixed;

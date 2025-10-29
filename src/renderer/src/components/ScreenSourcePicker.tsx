@@ -105,9 +105,11 @@ function ScreenSourcePicker({ onSelect, onCancel }: ScreenSourcePickerProps): Re
           ))}
         </div>
 
-        <button onClick={onCancel} className="cancel-button">
-          Cancel
-        </button>
+        <div className="picker-actions">
+          <button onClick={onCancel} className="picker-cancel-button">
+            Cancel
+          </button>
+        </div>
       </div>
     </div>
   )

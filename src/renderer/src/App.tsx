@@ -413,7 +413,7 @@ function App(): React.JSX.Element {
         style={{
           position: 'fixed',
           bottom: 20,
-          right: 120,
+          right: 150,
           zIndex: 999,
           padding: '12px 24px',
           background: '#646cff',
