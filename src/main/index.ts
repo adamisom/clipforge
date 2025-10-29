@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, dialog, Menu } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
@@ -137,6 +137,62 @@ app.whenReady().then(() => {
       })
     }
   )
+
+  // Setup application menu
+  const mainWindow = BrowserWindow.getAllWindows()[0]
+  const menuTemplate = [
+    {
+      label: 'File',
+      submenu: [
+        {
+          label: 'Import Video',
+          accelerator: 'CmdOrCtrl+O',
+          click: () => {
+            mainWindow.webContents.send('menu-import')
+          }
+        },
+        {
+          label: 'Export Video',
+          accelerator: 'CmdOrCtrl+E',
+          click: () => {
+            mainWindow.webContents.send('menu-export')
+          }
+        },
+        { type: 'separator' as const },
+        {
+          label: 'Quit',
+          accelerator: 'CmdOrCtrl+Q',
+          role: 'quit' as const
+        }
+      ]
+    },
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' as const },
+        { role: 'redo' as const },
+        { type: 'separator' as const },
+        { role: 'cut' as const },
+        { role: 'copy' as const },
+        { role: 'paste' as const }
+      ]
+    },
+    {
+      label: 'View',
+      submenu: [
+        { role: 'reload' as const },
+        { role: 'forceReload' as const },
+        { role: 'toggleDevTools' as const },
+        { type: 'separator' as const },
+        { role: 'resetZoom' as const },
+        { role: 'zoomIn' as const },
+        { role: 'zoomOut' as const }
+      ]
+    }
+  ]
+
+  const menu = Menu.buildFromTemplate(menuTemplate)
+  Menu.setApplicationMenu(menu)
 
   createWindow()
 

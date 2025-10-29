@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import './assets/main.css'
 import Timeline from './components/Timeline'
 import VideoPreview from './components/VideoPreview'
@@ -60,7 +60,7 @@ function VideoEditor({
     setVideoState((prev) => ({ ...prev, playheadPosition: position, isPlaying: false }))
   }
 
-  const handleExport = async (): Promise<void> => {
+  const handleExport = useCallback(async (): Promise<void> => {
     try {
       // Get output path from user
       const outputPath = await window.api.selectSavePath()
@@ -80,7 +80,22 @@ function VideoEditor({
       console.error('Export failed:', error)
       alert(`Export failed: ${error}`)
     }
-  }
+  }, [videoState.sourcePath, videoState.trimStart, videoState.trimEnd])
+
+  // Listen for menu events
+  useEffect(() => {
+    const handleMenuExport = (): void => {
+      if (videoState.sourcePath) {
+        handleExport()
+      }
+    }
+
+    window.api.onMenuExport(handleMenuExport)
+
+    return () => {
+      window.api.removeAllListeners('menu-export')
+    }
+  }, [videoState.sourcePath, handleExport])
 
   return (
     <div className="video-editor">
@@ -143,7 +158,7 @@ function App(): React.JSX.Element {
   })
 
   // Import handler
-  const handleImport = async (): Promise<void> => {
+  const handleImport = useCallback(async (): Promise<void> => {
     try {
       const filePath = await window.api.selectVideoFile()
       if (!filePath) return
@@ -168,7 +183,7 @@ function App(): React.JSX.Element {
       console.error('Import failed:', error)
       alert(`Failed to import video: ${error}`)
     }
-  }
+  }, [])
 
   // Drag and drop handlers
   const handleDragOver = (e: React.DragEvent): void => {
@@ -213,6 +228,19 @@ function App(): React.JSX.Element {
       alert(`Failed to import video: ${error}`)
     }
   }
+
+  // Listen for menu import event
+  useEffect(() => {
+    const handleMenuImport = (): void => {
+      handleImport()
+    }
+
+    window.api.onMenuImport(handleMenuImport)
+
+    return () => {
+      window.api.removeAllListeners('menu-import')
+    }
+  }, [handleImport])
 
   return (
     <div onDragOver={handleDragOver} onDrop={handleDrop} style={{ width: '100%', height: '100vh' }}>

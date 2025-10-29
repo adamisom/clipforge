@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { formatTime } from '../utils/videoUtils'
 
 interface TimelineProps {
   duration: number
@@ -30,13 +31,6 @@ function Timeline({
   const timeMarkers: number[] = []
   for (let i = 0; i <= Math.ceil(duration); i++) {
     timeMarkers.push(i)
-  }
-
-  // Format time display
-  const formatTime = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60)
-    const secs = Math.floor(seconds % 60)
-    return `${mins}:${secs.toString().padStart(2, '0')}`
   }
 
   // Handle trim drag start
@@ -92,7 +86,7 @@ function Timeline({
       const rect = timelineRef.current!.getBoundingClientRect()
       const x = e.clientX - rect.left
       const time = Math.max(0, Math.min(duration, x / pixelsPerSecond))
-      
+
       // Constrain playhead to trimmed region
       const relativeTime = Math.max(0, Math.min(trimEnd - trimStart, time - trimStart))
       onPlayheadChange(relativeTime)
@@ -113,11 +107,7 @@ function Timeline({
 
   return (
     <div className="timeline-panel">
-      <div
-        ref={timelineRef}
-        className="timeline-container"
-        style={{ width: `${timelineWidth}px` }}
-      >
+      <div ref={timelineRef} className="timeline-container" style={{ width: `${timelineWidth}px` }}>
         {/* Time Ruler */}
         <div className="time-ruler">
           {timeMarkers.map((time) => (
@@ -149,9 +139,7 @@ function Timeline({
               top: '15px'
             }}
           >
-            <span
-              style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-            >
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               Video Clip
             </span>
 

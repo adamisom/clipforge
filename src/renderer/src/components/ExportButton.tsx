@@ -7,7 +7,12 @@ interface ExportButtonProps {
   onExport: () => void
 }
 
-function ExportButton({ sourcePath, trimStart, trimEnd, onExport }: ExportButtonProps): React.JSX.Element {
+function ExportButton({
+  sourcePath,
+  trimStart,
+  trimEnd,
+  onExport
+}: ExportButtonProps): React.JSX.Element {
   const [isExporting, setIsExporting] = useState(false)
   const [exportProgress, setExportProgress] = useState(0)
   const [exportError, setExportError] = useState<string | null>(null)
@@ -61,21 +66,14 @@ function ExportButton({ sourcePath, trimStart, trimEnd, onExport }: ExportButton
       </button>
       {isExporting && (
         <div className="export-progress-bar">
-          <div
-            className="export-progress-fill"
-            style={{ width: `${exportProgress}%` }}
-          />
+          <div className="export-progress-fill" style={{ width: `${exportProgress}%` }} />
         </div>
       )}
-      {exportError && (
-        <div className="export-error">
-          Error: {exportError}
-        </div>
-      )}
+      {exportError && <div className="export-error">Error: {exportError}</div>}
       <div className="export-info">
         <small>
-          Trim: {trimStart.toFixed(1)}s - {trimEnd.toFixed(1)}s
-          ({(trimEnd - trimStart).toFixed(1)}s total)
+          Trim: {trimStart.toFixed(1)}s - {trimEnd.toFixed(1)}s ({(trimEnd - trimStart).toFixed(1)}s
+          total)
         </small>
       </div>
     </div>
@@ -83,4 +81,3 @@ function ExportButton({ sourcePath, trimStart, trimEnd, onExport }: ExportButton
 }
 
 export default ExportButton
-
