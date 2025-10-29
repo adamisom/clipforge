@@ -99,6 +99,8 @@ function App(): React.JSX.Element {
       {clips.length === 0 ? (
         <WelcomeScreen
           onImport={handleImport}
+          onRecordWebcam={() => setShowWebcamRecorder(true)}
+          onRecordScreen={() => setShowScreenRecorder(true)}
           isDragging={isDragging}
           enableDragAndDrop={ENABLE_DRAG_AND_DROP}
         />
