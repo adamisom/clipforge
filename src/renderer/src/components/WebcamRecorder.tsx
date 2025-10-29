@@ -20,7 +20,7 @@ function WebcamRecorder({ onRecordingComplete, onClose }: WebcamRecorderProps): 
   const recordingStartTimeRef = useRef<number>(0) // Track actual start time for accurate duration
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Initialize webcam on mount
+  // Initialize webcam on mount and handle Esc key
   useEffect(() => {
     const initWebcam = async (): Promise<void> => {
       try {
@@ -44,8 +44,11 @@ function WebcamRecorder({ onRecordingComplete, onClose }: WebcamRecorderProps): 
 
     // Handle Esc key during countdown
     const handleKeyDown = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape' && stage === 'countdown') {
-        handleCancelCountdown()
+      if (e.key === 'Escape') {
+        // Cancel countdown if in countdown stage
+        if (countdownIntervalRef.current) {
+          handleCancelCountdown()
+        }
       }
     }
 
@@ -65,7 +68,7 @@ function WebcamRecorder({ onRecordingComplete, onClose }: WebcamRecorderProps): 
         clearInterval(countdownIntervalRef.current)
       }
     }
-  }, [stage])
+  }, []) // Empty deps - only run on mount/unmount
 
   const startCountdown = (): void => {
     setStage('countdown')
