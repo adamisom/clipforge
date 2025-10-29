@@ -94,11 +94,6 @@ Phase 3 transforms ClipForge from a single-track sequential editor to a professi
 - Default: 50 px/sec (current auto-scale baseline)
 - **Zoom center:** Playhead position (keeps playhead visually stable)
 
-**Drag-to-Reorder Conflict Resolution:**
-- Clips draggable from **center** only (not edges)
-- Trim handles remain on edges with separate drag handlers
-- Prevents drag conflict between reorder and trim
-
 ---
 
 ## Phase Breakdown
@@ -251,6 +246,8 @@ const handleMoveToTrack = (trackIndex: 0 | 1) => {
 - "Move to Track 1" → clip moves to Track 1
 - "Move to Track 0" → clip returns to Track 0
 
+**⚠️ Note:** Add click-outside handler to close context menu (overlay with onClick to dismiss).
+
 ---
 
 #### A.4: Multi-Track Playback Logic (~2 hours)
@@ -262,11 +259,12 @@ const handleMoveToTrack = (trackIndex: 0 | 1) => {
 **Changes:**
 ```typescript
 // useMultiClipPlayback.ts
-// Determine which clip to play from TRACK 0 only
+// CRITICAL: Calculate positions PER TRACK, not globally
 const currentClip = useMemo(() => {
   const track0Clips = clips.filter(c => c.trackIndex === 0)
-  return getCurrentClip(track0Clips, clipPositions, playheadPosition)
-}, [clips, clipPositions, playheadPosition])
+  const track0Positions = calculateClipPositions(track0Clips)  // Calculate for Track 0 only
+  return getCurrentClip(track0Clips, track0Positions, playheadPosition)
+}, [clips, playheadPosition])
 
 // Note: Track 1 clips are NOT played back in preview
 // They only appear during export as overlay
@@ -345,6 +343,8 @@ const SimultaneousRecorder = ({ onComplete, onClose }) => {
 - Select screen source → shows webcam preview + countdown
 - Recording indicator shows both "Screen" + "Webcam" active
 - Stop → both recordings saved
+
+**⚠️ Note:** Simultaneous recordings may have slightly different durations (±0.1s) due to MediaRecorder timing. Use recording timer as source of truth for both clips, not individual blob durations. Also add error handling for permission denials and stream failures.
 
 ---
 
@@ -527,6 +527,17 @@ ipcMain.handle('export-multi-track', async (event, {
   outputPath 
 }) => {
   try {
+    // CRITICAL: Check if tracks have different durations
+    const track0Duration = getTotalDuration(track0Clips)
+    const track1Duration = getTotalDuration(track1Clips)
+    
+    if (Math.abs(track0Duration - track1Duration) > 0.5) {
+      // Duration mismatch > 0.5 seconds
+      console.warn(`Track duration mismatch: Track 0=${track0Duration}s, Track 1=${track1Duration}s`)
+      // FFmpeg will overlay for shortest duration, then continue Track 0 alone
+      // Consider showing warning to user in renderer
+    }
+    
     // Export Track 0 to temp file (concatenated)
     const track0TempPath = path.join(os.tmpdir(), 'clipforge-track0-temp.mp4')
     await exportMultiClip(track0Clips, track0TempPath)
@@ -648,18 +659,27 @@ const [audioMix, setAudioMix] = useState({
 **Changes:**
 ```typescript
 // In export-multi-track handler
+// CRITICAL: Handle single-track exports (no Track 1)
+const hasTrack1 = track1Clips.length > 0
+
+const videoFilters = [
+  `[1:v]scale=iw*${scale}:ih*${scale}[pip]`,
+  `[0:v][pip]overlay=${x}:${y}[out]`
+]
+
+const audioFilters = hasTrack1
+  ? [
+      `[0:a]volume=${audioMix.track0Volume / 100}[a0]`,
+      `[1:a]volume=${audioMix.track1Volume / 100}[a1]`,
+      `[a0][a1]amix=inputs=2:duration=first[aout]`
+    ]
+  : [
+      `[0:a]volume=${audioMix.track0Volume / 100}[aout]`
+    ]
+
 ffmpeg(track0TempPath)
-  .input(track1TempPath)
-  .complexFilter([
-    // Video overlay (from Phase C)
-    `[1:v]scale=iw*${scale}:ih*${scale}[pip]`,
-    `[0:v][pip]overlay=${x}:${y}[out]`,
-    
-    // Audio mixing (NEW)
-    `[0:a]volume=${audioMix.track0Volume / 100}[a0]`,  // Adjust Track 0 audio
-    `[1:a]volume=${audioMix.track1Volume / 100}[a1]`,  // Adjust Track 1 audio
-    `[a0][a1]amix=inputs=2:duration=first[aout]`       // Mix both tracks
-  ])
+  .input(hasTrack1 ? track1TempPath : null)
+  .complexFilter([...videoFilters, ...audioFilters])
   .map('[out]')    // Video output
   .map('[aout]')   // Audio output
   .output(outputPath)
@@ -738,6 +758,8 @@ const clipWidth = clip.timelineDuration * zoomLevel  // Use zoomLevel instead of
 - Cmd+scroll down → timeline zooms out (clips narrower)
 - Zoom clamped to MIN/MAX
 
+**⚠️ Note:** Pass `zoomLevel` as prop to child components that calculate clip widths.
+
 ---
 
 #### E.3: Zoom to Playhead (Not Viewport Center) (~1 hour)
@@ -777,6 +799,8 @@ const zoomInWithPlayhead = () => {
 - Position playhead mid-timeline
 - Zoom in → playhead stays in same visual position
 - Zoom out → playhead stays in same visual position
+
+**⚠️ Note:** Use `useLayoutEffect` instead of `useEffect` for scroll manipulation to prevent flicker.
 
 ---
 
