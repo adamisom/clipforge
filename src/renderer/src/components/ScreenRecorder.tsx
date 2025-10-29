@@ -9,10 +9,10 @@ interface ScreenRecorderProps {
 function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): React.JSX.Element {
   const [stage, setStage] = useState<'picker' | 'countdown' | 'recording'>('picker')
   const [countdown, setCountdown] = useState<number | null>(null)
-  const [stream, setStream] = useState<MediaStream | null>(null)
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
+  const streamRef = useRef<MediaStream | null>(null)
 
   const handleSourceSelect = async (sourceId: string): Promise<void> => {
     try {
@@ -41,7 +41,7 @@ function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): 
         throw new Error('No video tracks in stream')
       }
 
-      setStream(mediaStream)
+      streamRef.current = mediaStream
 
       setStage('countdown')
       setCountdown(3)
@@ -203,9 +203,7 @@ function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): 
     const handleStop = (): void => {
       if (mediaRecorderRef.current && stage === 'recording') {
         mediaRecorderRef.current.stop()
-        if (stream) {
-          stream.getTracks().forEach((track) => track.stop())
-        }
+        // Don't stop stream here - let onstop handler do it
       }
     }
 
@@ -213,11 +211,10 @@ function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): 
 
     return () => {
       window.api.removeAllListeners('stop-recording')
-      if (stream) {
-        stream.getTracks().forEach((track) => track.stop())
-      }
+      // DON'T stop stream tracks in cleanup - this was causing premature stop!
+      // Stream will be stopped in mediaRecorder.onstop handler
     }
-  }, [stage, stream])
+  }, [stage])
 
   if (stage === 'picker') {
     return <ScreenSourcePicker onSelect={handleSourceSelect} onCancel={onClose} />
