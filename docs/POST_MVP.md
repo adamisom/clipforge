@@ -4,6 +4,62 @@ This document tracks future enhancements and test additions to consider after MV
 
 ---
 
+## 🚨 Critical Tech Debt
+
+### Security: File URL Handling (MUST FIX BEFORE PRODUCTION)
+
+**Current Implementation:**
+```typescript
+// src/main/index.ts
+webPreferences: {
+  webSecurity: false,              // ⚠️ DISABLES same-origin policy, CORS
+  allowRunningInsecureContent: true // ⚠️ Allows mixed HTTP/file:// content
+}
+
+// src/renderer/.../VideoPreview.tsx
+<video src={`file://${sourcePath}`} />  // ⚠️ Direct file:// URLs
+```
+
+**Security Risks:**
+- `webSecurity: false` disables browser security protections
+- Vulnerable to XSS if any user content is rendered
+- `file://` URLs blocked by CORS in dev mode (http://localhost:5174)
+- Not acceptable for production distribution
+
+**Proper Solution:**
+Implement custom protocol handler for safe local file access:
+
+```typescript
+// In main process (src/main/index.ts):
+import { protocol } from 'electron'
+
+app.whenReady().then(() => {
+  protocol.registerFileProtocol('clipforge', (request, callback) => {
+    const url = request.url.replace('clipforge://', '')
+    const decodedPath = decodeURIComponent(url)
+    callback({ path: decodedPath })
+  })
+  
+  // Remove these from webPreferences:
+  // webSecurity: false ❌
+  // allowRunningInsecureContent: true ❌
+})
+
+// In renderer (VideoPreview.tsx):
+<video src={`clipforge:///${sourcePath}`} />
+```
+
+**Benefits:**
+- ✅ Maintains browser security protections
+- ✅ Works in both dev and production
+- ✅ Scoped to only serve video files
+- ✅ Can add additional validation/sandboxing
+
+**Estimated Effort:** 1-2 hours  
+**Priority:** 🔴 CRITICAL before public distribution
+
+---
+
 ## 🧪 Medium Priority Tests (Deferred)
 
 ### 4. State Update Logic Tests

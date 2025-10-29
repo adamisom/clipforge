@@ -29,7 +29,8 @@ function createWindow(): void {
       contextIsolation: true, // CRITICAL: Isolates renderer from Electron APIs
       nodeIntegration: false, // CRITICAL: Prevents direct Node.js access in renderer
       sandbox: false,
-      webSecurity: false // Required for file:// URLs in development
+      webSecurity: false, // Required for file:// URLs in development
+      allowRunningInsecureContent: true // Allow mixed content in dev
     }
   })
 
