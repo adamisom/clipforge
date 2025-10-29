@@ -27,6 +27,12 @@ body {
   justify-content: center;
   height: 100vh;
   background: #1a1a1a;
+  transition: background 0.3s;
+}
+
+.welcome-screen.drag-over {
+  background: #252525;
+  border: 3px dashed #007aff;
 }
 
 .welcome-screen h1 {
@@ -38,7 +44,13 @@ body {
 .welcome-screen p {
   font-size: 18px;
   color: #888;
-  margin-bottom: 32px;
+  margin-bottom: 8px;
+}
+
+.welcome-screen .drag-hint {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 24px;
 }
 
 .import-button {
@@ -83,6 +95,7 @@ body {
   border-top: 1px solid #333;
   overflow-x: auto;
   overflow-y: hidden;
+  padding-left: 60px; /* Add left padding so trim handles are easier to grab */
 }
 
 .info-panel {
@@ -167,15 +180,17 @@ body {
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 8px;
+  width: 12px; /* Wider for easier grabbing */
   background: #007aff;
-  opacity: 0.7;
+  opacity: 0.9; /* More visible by default */
   cursor: ew-resize;
+  transition: all 0.2s;
 }
 
 .trim-handle:hover {
   opacity: 1;
   background: #0066ff;
+  width: 16px; /* Even wider on hover */
 }
 
 .trim-handle-left {
@@ -230,13 +245,18 @@ body {
 }
 
 .video-controls button {
-  padding: 8px 16px;
+  padding: 10px 20px;
   background: #007aff;
   color: white;
   border: none;
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 18px;
+  min-width: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
 }
 
 .video-controls button:hover {

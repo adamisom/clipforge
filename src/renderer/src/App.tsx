@@ -19,11 +19,18 @@ interface VideoState {
 }
 
 // Components will be defined inline for now
-function WelcomeScreen({ onImport }: { onImport: () => void }): React.JSX.Element {
+function WelcomeScreen({
+  onImport,
+  isDragging
+}: {
+  onImport: () => void
+  isDragging: boolean
+}): React.JSX.Element {
   return (
-    <div className="welcome-screen">
+    <div className={`welcome-screen ${isDragging ? 'drag-over' : ''}`}>
       <h1>ClipForge</h1>
       <p>Import a video to get started</p>
+      <p className="drag-hint">or drag and drop a video file here</p>
       <button onClick={onImport} className="import-button">
         Import Video
       </button>
@@ -156,6 +163,7 @@ function App(): React.JSX.Element {
     isPlaying: false,
     metadata: { filename: '', resolution: '' }
   })
+  const [isDragging, setIsDragging] = useState(false)
 
   // Import handler
   const handleImport = useCallback(async (): Promise<void> => {
@@ -188,10 +196,17 @@ function App(): React.JSX.Element {
   // Drag and drop handlers
   const handleDragOver = (e: React.DragEvent): void => {
     e.preventDefault()
+    setIsDragging(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent): void => {
+    e.preventDefault()
+    setIsDragging(false)
   }
 
   const handleDrop = async (e: React.DragEvent): Promise<void> => {
     e.preventDefault()
+    setIsDragging(false)
 
     const files = Array.from(e.dataTransfer.files)
     const videoFiles = files.filter((file) => {
@@ -243,9 +258,14 @@ function App(): React.JSX.Element {
   }, [handleImport])
 
   return (
-    <div onDragOver={handleDragOver} onDrop={handleDrop} style={{ width: '100%', height: '100vh' }}>
+    <div
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      style={{ width: '100%', height: '100vh' }}
+    >
       {!videoState.sourcePath ? (
-        <WelcomeScreen onImport={handleImport} />
+        <WelcomeScreen onImport={handleImport} isDragging={isDragging} />
       ) : (
         <VideoEditor videoState={videoState} setVideoState={setVideoState} />
       )}

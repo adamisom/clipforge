@@ -78,7 +78,7 @@ function VideoPreview({
             }}
           />
           <div className="video-controls">
-            <button onClick={onPlayPause}>{isPlaying ? 'Pause' : 'Play'}</button>
+            <button onClick={onPlayPause}>{isPlaying ? '⏸' : '▶'}</button>
           </div>
         </>
       ) : (
