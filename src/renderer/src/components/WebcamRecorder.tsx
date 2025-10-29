@@ -127,14 +127,14 @@ function WebcamRecorder({ onRecordingComplete, onClose }: WebcamRecorderProps): 
 
       mediaRecorder.start(1000)
       mediaRecorderRef.current = mediaRecorder
-      
+
       // Start recording timer BEFORE setting stage to avoid re-render race
       setRecordingTime(0)
       recordingStartTimeRef.current = Date.now()
       timerIntervalRef.current = setInterval(() => {
         setRecordingTime((prev) => prev + 1)
       }, 1000)
-      
+
       setStage('recording')
     } catch (err) {
       console.error('Recording start error:', err)
