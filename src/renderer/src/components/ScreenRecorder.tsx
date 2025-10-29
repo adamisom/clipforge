@@ -158,10 +158,11 @@ function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): 
       mediaRecorderRef.current = mediaRecorder
       setStage('recording')
 
-      // Start recording timer
+      // Start recording timer - initialize to 0 then increment every second
+      setRecordingTime(0)
       recordingStartTimeRef.current = Date.now()
       timerIntervalRef.current = setInterval(() => {
-        setRecordingTime(Math.floor((Date.now() - recordingStartTimeRef.current) / 1000))
+        setRecordingTime((prev) => prev + 1)
       }, 1000)
     } catch (err) {
       console.error('Recording start error:', err)

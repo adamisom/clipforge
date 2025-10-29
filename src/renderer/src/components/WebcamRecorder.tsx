@@ -17,6 +17,7 @@ function WebcamRecorder({ onRecordingComplete, onClose }: WebcamRecorderProps): 
   const chunksRef = useRef<Blob[]>([])
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const hasCompletedRef = useRef(false) // Prevent double-completion
+  const recordingStartTimeRef = useRef<number>(0) // Track actual start time for accurate duration
 
   // Initialize webcam on mount
   useEffect(() => {
@@ -95,6 +96,9 @@ function WebcamRecorder({ onRecordingComplete, onClose }: WebcamRecorderProps): 
           return
         }
 
+        // Calculate final duration from actual start time (more accurate than state)
+        const finalDuration = Math.floor((Date.now() - recordingStartTimeRef.current) / 1000)
+
         if (chunksRef.current.length === 0) {
           console.error('No recording data available')
           setError('Recording failed: No data captured')
@@ -109,9 +113,11 @@ function WebcamRecorder({ onRecordingComplete, onClose }: WebcamRecorderProps): 
           return
         }
 
-        console.log(`Recording complete: ${blob.size} bytes, ${chunksRef.current.length} chunks`)
+        console.log(
+          `Recording complete: ${blob.size} bytes, ${chunksRef.current.length} chunks, ${finalDuration}s`
+        )
         hasCompletedRef.current = true
-        onRecordingComplete(blob, recordingTime)
+        onRecordingComplete(blob, finalDuration)
       }
 
       mediaRecorder.onerror = (event) => {
@@ -121,12 +127,15 @@ function WebcamRecorder({ onRecordingComplete, onClose }: WebcamRecorderProps): 
 
       mediaRecorder.start(1000)
       mediaRecorderRef.current = mediaRecorder
-      setStage('recording')
-
-      // Start recording timer
+      
+      // Start recording timer BEFORE setting stage to avoid re-render race
+      setRecordingTime(0)
+      recordingStartTimeRef.current = Date.now()
       timerIntervalRef.current = setInterval(() => {
         setRecordingTime((prev) => prev + 1)
       }, 1000)
+      
+      setStage('recording')
     } catch (err) {
       console.error('Recording start error:', err)
       setError('Failed to start recording')
