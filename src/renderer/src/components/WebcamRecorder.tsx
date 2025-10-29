@@ -74,6 +74,12 @@ function WebcamRecorder({ onRecordingComplete, onClose }: WebcamRecorderProps): 
       return
     }
 
+    // Prevent double-initialization
+    if (mediaRecorderRef.current) {
+      console.warn('MediaRecorder already exists, skipping initialization')
+      return
+    }
+
     try {
       // Reset chunks array
       chunksRef.current = []
@@ -131,6 +137,12 @@ function WebcamRecorder({ onRecordingComplete, onClose }: WebcamRecorderProps): 
       // Start recording timer BEFORE setting stage to avoid re-render race
       setRecordingTime(0)
       recordingStartTimeRef.current = Date.now()
+
+      // Clear any existing timer before starting new one
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current)
+      }
+
       timerIntervalRef.current = setInterval(() => {
         setRecordingTime((prev) => prev + 1)
       }, 1000)

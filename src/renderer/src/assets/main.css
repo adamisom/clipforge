@@ -385,7 +385,7 @@ body {
 .recording-indicator {
   position: absolute;
   top: 20px;
-  left: -180px; /* Move outside webcam view to the left */
+  left: 20px; /* Back inside the modal */
   background: rgba(0, 0, 0, 0.8);
   padding: 8px 16px;
   border-radius: 20px;
