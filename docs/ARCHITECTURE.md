@@ -476,20 +476,37 @@ const handleMouseMove = (e) => {
 // In main process
 import ffmpeg from 'fluent-ffmpeg'
 import ffmpegInstaller from '@ffmpeg-installer/ffmpeg'
+import ffprobeInstaller from '@ffprobe-installer/ffprobe'
 import { app } from 'electron'
-import path from 'path'
+import { join } from 'path'
+import fs from 'fs'
 
+// Separate binaries for FFmpeg and FFprobe
 const ffmpegPath = app.isPackaged
-  ? path.join(process.resourcesPath, 'ffmpeg') // Production: bundled binary
+  ? join(process.resourcesPath, 'ffmpeg') // Production: bundled binary
   : ffmpegInstaller.path // Development: node_modules
 
-ffmpeg.setFfmpegPath(ffmpegPath)
+const ffprobePath = app.isPackaged
+  ? join(process.resourcesPath, 'ffprobe') // Production: bundled binary
+  : ffprobeInstaller.path // Development: node_modules
 
-// Verify binary exists
+// Verify binaries exist
 if (!fs.existsSync(ffmpegPath)) {
-  throw new Error(`FFmpeg not found at: ${ffmpegPath}`)
+  console.error('FFmpeg not found at:', ffmpegPath)
+} else {
+  ffmpeg.setFfmpegPath(ffmpegPath)
+  console.log('FFmpeg path set to:', ffmpegPath)
+}
+
+if (!fs.existsSync(ffprobePath)) {
+  console.error('FFprobe not found at:', ffprobePath)
+} else {
+  ffmpeg.setFfprobePath(ffprobePath)
+  console.log('FFprobe path set to:', ffprobePath)
 }
 ```
+
+**Important**: We use **separate** `@ffprobe-installer/ffprobe` package because `@ffmpeg-installer` bundles `ffprobe` as a symlink to `ffmpeg`, which causes issues in packaged Electron apps (argv[0] detection fails, binary runs as `ffmpeg` instead of `ffprobe`).
 
 ### Export Command
 
@@ -529,11 +546,23 @@ webPreferences: {
   contextIsolation: true,
   nodeIntegration: false,
   preload: join(__dirname, '../preload/index.js'),
-  webSecurity: false  // REQUIRED for file:// URLs in dev
+  sandbox: false,
+  webSecurity: false,  // Required for file:// URLs in development
+  allowRunningInsecureContent: true  // Allow mixed content in dev
 }
 ```
 
-**Why**: `file://` protocol is blocked by default. `webSecurity: false` allows loading local files.
+**Why**: `file://` protocol is blocked by default Content Security Policy. `webSecurity: false` allows loading local files in development.
+
+**⚠️ CRITICAL SECURITY CONCERN**: This is **NOT production-ready**. See `POST_MVP.md` for migration to custom protocol handler.
+
+**Content Security Policy** (in `index.html`):
+```html
+<meta
+  http-equiv="Content-Security-Policy"
+  content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' file: data:"
+/>
+```
 
 **Renderer**:
 
@@ -732,23 +761,31 @@ it('should extract video metadata', async () => {
 ```yaml
 # electron-builder.yml
 extraResources:
-  - from: 'node_modules/@ffmpeg-installer/darwin-x64/ffmpeg'
-    to: 'ffmpeg'
+  - from: node_modules/@ffmpeg-installer/darwin-arm64/ffmpeg
+    to: ffmpeg
+  - from: node_modules/@ffprobe-installer/darwin-arm64/ffprobe
+    to: ffprobe
 ```
 
-**Why**: FFmpeg binary must be outside `.asar` archive (cannot execute files inside .asar).
+**Why**: 
+- FFmpeg and FFprobe binaries must be outside `.asar` archive (cannot execute files inside .asar)
+- We bundle **both** binaries separately (not symlinks)
+- Path must match the architecture: `darwin-arm64` for Apple Silicon Macs
+
+**Note**: DMG distribution is currently disabled due to `hdiutil` errors. Using `.zip` format instead. See `POST_MVP.md` for details.
 
 ### Application Size
 
 - Electron: ~150 MB
-- FFmpeg: ~50 MB
+- FFmpeg: ~35 MB (darwin-arm64)
+- FFprobe: ~17 MB (darwin-arm64)
 - App code: ~10 MB
-- **Total**: ~210 MB
+- **Total**: ~212 MB
 
 ### Distribution
 
 Build command: `npm run build:mac`
-Output: `.dmg` file in `dist/` directory
+Output: `.zip` file in `dist/` directory (DMG currently disabled)
 
 **Testing**: Install on clean macOS (no Node.js, no dev tools) and verify all features work.
 
@@ -784,5 +821,5 @@ Output: `.dmg` file in `dist/` directory
 
 ---
 
-**Last Updated**: October 27, 2024
-**Version**: MVP v1.0
+**Last Updated**: October 29, 2025
+**Version**: MVP v1.0 (Complete)
