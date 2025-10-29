@@ -2,18 +2,21 @@ import { useState, useRef, useEffect } from 'react'
 import ScreenSourcePicker from './ScreenSourcePicker'
 
 interface ScreenRecorderProps {
-  onRecordingComplete: (blob: Blob) => void
+  onRecordingComplete: (blob: Blob, durationSeconds: number) => void
   onClose: () => void
 }
 
 function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): React.JSX.Element {
   const [stage, setStage] = useState<'picker' | 'countdown' | 'recording'>('picker')
   const [countdown, setCountdown] = useState<number | null>(null)
+  const [recordingTime, setRecordingTime] = useState(0)
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
   const streamRef = useRef<MediaStream | null>(null)
   const hasCompletedRef = useRef(false) // Prevent double-completion
+  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const recordingStartTimeRef = useRef<number>(0)
 
   const handleSourceSelect = async (sourceId: string): Promise<void> => {
     try {
@@ -95,7 +98,15 @@ function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): 
 
       mediaRecorder.onstop = async () => {
         console.log('MediaRecorder stopped')
-        
+
+        // Stop timer
+        if (timerIntervalRef.current) {
+          clearInterval(timerIntervalRef.current)
+        }
+
+        // Calculate final duration (more accurate than state)
+        const finalDuration = Math.floor((Date.now() - recordingStartTimeRef.current) / 1000)
+
         // Prevent double-completion (can happen if component unmounts during recording)
         if (hasCompletedRef.current) {
           console.log('Recording already completed, ignoring duplicate onstop')
@@ -124,10 +135,12 @@ function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): 
           return
         }
 
-        console.log(`Recording complete: ${blob.size} bytes, ${chunksRef.current.length} chunks`)
+        console.log(
+          `Recording complete: ${blob.size} bytes, ${chunksRef.current.length} chunks, ${finalDuration}s`
+        )
         hasCompletedRef.current = true
         await window.api.stopRecording()
-        onRecordingComplete(blob)
+        onRecordingComplete(blob, finalDuration)
       }
 
       mediaRecorder.onerror = (event) => {
@@ -144,6 +157,12 @@ function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): 
 
       mediaRecorderRef.current = mediaRecorder
       setStage('recording')
+
+      // Start recording timer
+      recordingStartTimeRef.current = Date.now()
+      timerIntervalRef.current = setInterval(() => {
+        setRecordingTime(Math.floor((Date.now() - recordingStartTimeRef.current) / 1000))
+      }, 1000)
     } catch (err) {
       console.error('Recording start error:', err)
       alert('Failed to start recording')
@@ -170,6 +189,12 @@ function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): 
     }
   }, [stage])
 
+  const formatTime = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins}:${secs.toString().padStart(2, '0')}`
+  }
+
   if (stage === 'picker') {
     return <ScreenSourcePicker onSelect={handleSourceSelect} onCancel={onClose} />
   }
@@ -189,7 +214,7 @@ function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): 
       <div className="recording-overlay">
         <div className="recording-indicator-box">
           <div className="recording-dot"></div>
-          <p>Recording in progress</p>
+          <p>Recording in progress • {formatTime(recordingTime)}</p>
           <p className="recording-hint">
             Window is minimized. Press <kbd>Cmd+Shift+S</kbd> to stop, or click the notification.
           </p>

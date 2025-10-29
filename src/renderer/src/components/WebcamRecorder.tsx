@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 
 interface WebcamRecorderProps {
-  onRecordingComplete: (blob: Blob) => void
+  onRecordingComplete: (blob: Blob, durationSeconds: number) => void
   onClose: () => void
 }
 
@@ -111,7 +111,7 @@ function WebcamRecorder({ onRecordingComplete, onClose }: WebcamRecorderProps): 
 
         console.log(`Recording complete: ${blob.size} bytes, ${chunksRef.current.length} chunks`)
         hasCompletedRef.current = true
-        onRecordingComplete(blob)
+        onRecordingComplete(blob, recordingTime)
       }
 
       mediaRecorder.onerror = (event) => {

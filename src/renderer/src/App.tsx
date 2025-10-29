@@ -177,7 +177,10 @@ function App(): React.JSX.Element {
   const [showWebcamRecorder, setShowWebcamRecorder] = useState(false)
   const [showScreenRecorder, setShowScreenRecorder] = useState(false)
 
-  const handleWebcamRecordingComplete = async (blob: Blob): Promise<void> => {
+  const handleWebcamRecordingComplete = async (
+    blob: Blob,
+    durationSeconds: number
+  ): Promise<void> => {
     try {
       // Prevent double-calls by immediately closing the webcam recorder
       setShowWebcamRecorder(false)
@@ -202,8 +205,8 @@ function App(): React.JSX.Element {
         sourceType: 'webcam',
         sourcePath: finalPath,
         sourceStartTime: 0,
-        sourceDuration: metadata.duration,
-        timelineDuration: metadata.duration,
+        sourceDuration: durationSeconds, // Use actual recording duration
+        timelineDuration: durationSeconds,
         metadata: {
           filename: metadata.filename,
           resolution: `${metadata.width}x${metadata.height}`,
@@ -218,7 +221,10 @@ function App(): React.JSX.Element {
     }
   }
 
-  const handleScreenRecordingComplete = async (blob: Blob): Promise<void> => {
+  const handleScreenRecordingComplete = async (
+    blob: Blob,
+    durationSeconds: number
+  ): Promise<void> => {
     try {
       // Prevent double-calls by immediately closing the screen recorder
       setShowScreenRecorder(false)
@@ -243,8 +249,8 @@ function App(): React.JSX.Element {
         sourceType: 'screen',
         sourcePath: finalPath,
         sourceStartTime: 0,
-        sourceDuration: metadata.duration,
-        timelineDuration: metadata.duration,
+        sourceDuration: durationSeconds, // Use actual recording duration
+        timelineDuration: durationSeconds,
         metadata: {
           filename: metadata.filename,
           resolution: `${metadata.width}x${metadata.height}`,
