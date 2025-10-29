@@ -11,6 +11,11 @@ files:
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
 asarUnpack:
   - resources/**
+extraResources:
+  - from: node_modules/@ffmpeg-installer/darwin-arm64/ffmpeg
+    to: ffmpeg
+  - from: node_modules/@ffprobe-installer/darwin-arm64/ffprobe
+    to: ffprobe
 win:
   executableName: clipforge
 nsis:
@@ -19,6 +24,8 @@ nsis:
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
 mac:
+  target:
+    - zip
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:
     - NSCameraUsageDescription: Application requests access to the device's camera.
@@ -26,8 +33,6 @@ mac:
     - NSDocumentsFolderUsageDescription: Application requests access to the user's Documents folder.
     - NSDownloadsFolderUsageDescription: Application requests access to the user's Downloads folder.
   notarize: false
-dmg:
-  artifactName: ${name}-${version}.${ext}
 linux:
   target:
     - AppImage

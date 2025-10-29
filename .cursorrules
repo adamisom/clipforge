@@ -6,17 +6,9 @@
 
 - Commit during substantial PR implementation work, before user review
 - Do NOT commit during user's PR review/approval phase unless they ask me to
-<!-- - **Before each commit:** run `npm run validate` (lint + type-check + test)
+- **Before each commit:** ALWAYS run `npm run validate` (lint + typecheck + build)
+- Must pass with 0 errors and 0 warnings before committing
 - If validation fails: fix issues, validate again, then commit fixes
-- **After commit:** Do NOT run validate again (linter may auto-fix imports, creating extra commits)
-- If linter auto-fixed files after commit, amend the commit you just made to include the lint fixes -->
-
-### Testing Workflow
-
-<!-- - **Before asking user to test:** ALWAYS run `npm run validate` with `required_permissions: ['all']`
-- Must pass with 0 errors and 0 warnings before user testing -->
-- Fix ALL linting errors and warnings before presenting code for testing
-- Use `--fix` option where applicable to auto-fix style issues
 
 <!-- ### Progress Tracking
 
