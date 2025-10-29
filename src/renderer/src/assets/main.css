@@ -370,6 +370,20 @@ body {
   animation: countdown-pulse 1s ease-in-out;
 }
 
+.countdown-cancel-hint {
+  margin-top: 20px;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.countdown-cancel-hint kbd {
+  background: rgba(255, 255, 255, 0.2);
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 13px;
+}
+
 @keyframes countdown-pulse {
   0%,
   100% {

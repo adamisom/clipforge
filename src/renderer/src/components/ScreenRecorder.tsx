@@ -13,6 +13,7 @@ function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): 
   const [countdown, setCountdown] = useState<number | null>(null)
   const [recordingTime, setRecordingTime] = useState(0)
   const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null)
+  const [selectedSourceName, setSelectedSourceName] = useState<string | null>(null)
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
@@ -20,11 +21,20 @@ function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): 
   const hasCompletedRef = useRef(false) // Prevent double-completion
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const recordingStartTimeRef = useRef<number>(0)
+  const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
-  const handleSourceSelect = (sourceId: string): void => {
-    // Just store the source ID, don't get the stream yet
+  const handleSourceSelect = (sourceId: string, sourceName: string): void => {
+    // Store both ID and name
     setSelectedSourceId(sourceId)
+    setSelectedSourceName(sourceName)
     setStage('ready-to-record')
+  }
+
+  const isRecordingOwnApp = (): boolean => {
+    // Check if recording ClipForge or Electron (case-insensitive)
+    if (!selectedSourceName) return false
+    const nameLower = selectedSourceName.toLowerCase()
+    return nameLower.includes('clipforge') || nameLower.includes('electron')
   }
 
   const handleStartRecording = (): void => {
@@ -32,10 +42,12 @@ function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): 
     setStage('countdown')
     setCountdown(3)
 
-    const countdownInterval = setInterval(() => {
+    countdownIntervalRef.current = setInterval(() => {
       setCountdown((prev) => {
         if (prev === null || prev <= 1) {
-          clearInterval(countdownInterval)
+          if (countdownIntervalRef.current) {
+            clearInterval(countdownIntervalRef.current)
+          }
           // AFTER countdown completes, get stream and start recording
           if (selectedSourceId) {
             getStreamAndBeginRecording(selectedSourceId)
@@ -45,6 +57,14 @@ function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): 
         return prev - 1
       })
     }, 1000)
+  }
+
+  const handleCancelCountdown = (): void => {
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current)
+    }
+    setCountdown(null)
+    setStage('ready-to-record')
   }
 
   const getStreamAndBeginRecording = async (sourceId: string): Promise<void> => {
@@ -71,8 +91,14 @@ function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): 
 
       streamRef.current = mediaStream
 
-      // Minimize and start recording immediately
-      minimizeAndBeginRecording(mediaStream)
+      // If recording own app, skip minimize. Otherwise, minimize first.
+      if (isRecordingOwnApp()) {
+        // Recording own app - start immediately without minimizing
+        beginRecording(mediaStream)
+      } else {
+        // Recording other content - minimize and start recording
+        minimizeAndBeginRecording(mediaStream)
+      }
     } catch (err) {
       console.error('Screen recording error:', err)
       alert(
@@ -214,12 +240,26 @@ function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): 
       }
     }
 
+    // Handle Esc key during countdown
+    const handleKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape' && stage === 'countdown') {
+        handleCancelCountdown()
+      }
+    }
+
     window.api.onStopRecording(handleStop)
+    window.addEventListener('keydown', handleKeyDown)
 
     return () => {
       window.api.removeAllListeners('stop-recording')
+      window.removeEventListener('keydown', handleKeyDown)
       // DON'T stop stream tracks in cleanup - this was causing premature stop!
       // Stream will be stopped in mediaRecorder.onstop handler
+
+      // Cleanup countdown interval
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current)
+      }
     }
   }, [stage])
 
@@ -234,14 +274,19 @@ function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): 
   }
 
   if (stage === 'ready-to-record') {
+    const recordingOwnApp = isRecordingOwnApp()
     return (
       <div className="countdown-overlay fullscreen">
         <div className="ready-dialog">
           <h2>Ready to Record</h2>
-          <p>
-            When you click Start, this window will minimize and recording will begin after a 3-2-1
-            countdown.
-          </p>
+          {recordingOwnApp ? (
+            <p>When you click Start, recording will begin after a 3-2-1 countdown.</p>
+          ) : (
+            <p>
+              When you click Start, this window will minimize and recording will begin after a 3-2-1
+              countdown.
+            </p>
+          )}
           <p>
             To stop recording, press <kbd>Cmd+Shift+S</kbd> or click the notification.
           </p>
@@ -263,6 +308,9 @@ function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): 
       <div className="countdown-overlay fullscreen">
         <div className="countdown-number">{countdown}</div>
         <p>Get ready to record...</p>
+        <p className="countdown-cancel-hint">
+          Press <kbd>Esc</kbd> to cancel
+        </p>
       </div>
     )
   }

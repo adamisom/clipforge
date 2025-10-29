@@ -7,7 +7,7 @@ interface ScreenSource {
 }
 
 interface ScreenSourcePickerProps {
-  onSelect: (sourceId: string) => void
+  onSelect: (sourceId: string, sourceName: string) => void
   onCancel: () => void
 }
 
@@ -94,7 +94,11 @@ function ScreenSourcePicker({ onSelect, onCancel }: ScreenSourcePickerProps): Re
 
         <div className="source-grid">
           {sources.map((source) => (
-            <div key={source.id} className="source-item" onClick={() => onSelect(source.id)}>
+            <div
+              key={source.id}
+              className="source-item"
+              onClick={() => onSelect(source.id, source.name)}
+            >
               <img src={source.thumbnail} alt={source.name} className="source-thumbnail" />
               <p className="source-name">{source.name}</p>
             </div>

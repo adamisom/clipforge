@@ -18,6 +18,7 @@ function WebcamRecorder({ onRecordingComplete, onClose }: WebcamRecorderProps): 
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const hasCompletedRef = useRef(false) // Prevent double-completion
   const recordingStartTimeRef = useRef<number>(0) // Track actual start time for accurate duration
+  const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   // Initialize webcam on mount
   useEffect(() => {
@@ -41,31 +42,55 @@ function WebcamRecorder({ onRecordingComplete, onClose }: WebcamRecorderProps): 
 
     initWebcam()
 
+    // Handle Esc key during countdown
+    const handleKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape' && stage === 'countdown') {
+        handleCancelCountdown()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+
     // Cleanup on unmount
     return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop())
       }
       if (timerIntervalRef.current) {
         clearInterval(timerIntervalRef.current)
       }
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current)
+      }
     }
-  }, [])
+  }, [stage])
 
   const startCountdown = (): void => {
     setStage('countdown')
     setCountdown(3)
 
-    const countdownInterval = setInterval(() => {
+    countdownIntervalRef.current = setInterval(() => {
       setCountdown((prev) => {
         if (prev === null || prev <= 1) {
-          clearInterval(countdownInterval)
+          if (countdownIntervalRef.current) {
+            clearInterval(countdownIntervalRef.current)
+          }
           beginRecording()
           return null
         }
         return prev - 1
       })
     }, 1000)
+  }
+
+  const handleCancelCountdown = (): void => {
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current)
+    }
+    setCountdown(null)
+    setStage('preview')
   }
 
   const beginRecording = (): void => {
@@ -202,6 +227,9 @@ function WebcamRecorder({ onRecordingComplete, onClose }: WebcamRecorderProps): 
         {stage === 'countdown' && countdown !== null && (
           <div className="countdown-overlay">
             <div className="countdown-number">{countdown}</div>
+            <p className="countdown-cancel-hint">
+              Press <kbd>Esc</kbd> to cancel
+            </p>
           </div>
         )}
 
