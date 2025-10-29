@@ -34,6 +34,10 @@ const api = {
     ipcRenderer.on('menu-import', callback),
   onMenuExport: (callback: (event: IpcRendererEvent) => void) =>
     ipcRenderer.on('menu-export', callback),
+  onMenuRecordWebcam: (callback: (event: IpcRendererEvent) => void) =>
+    ipcRenderer.on('menu-record-webcam', callback),
+  onMenuRecordScreen: (callback: (event: IpcRendererEvent) => void) =>
+    ipcRenderer.on('menu-record-screen', callback),
   onCheckUnsavedRecordings: (callback: () => void) =>
     ipcRenderer.on('check-unsaved-recordings', callback),
   respondUnsavedRecordings: (hasTempFiles: boolean) =>

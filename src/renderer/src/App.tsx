@@ -56,6 +56,25 @@ function App(): React.JSX.Element {
     }
   }, [handleImport])
 
+  // Listen for menu recording events
+  useEffect(() => {
+    const handleMenuRecordWebcam = (): void => {
+      setShowWebcamRecorder(true)
+    }
+
+    const handleMenuRecordScreen = (): void => {
+      setShowScreenRecorder(true)
+    }
+
+    window.api.onMenuRecordWebcam(handleMenuRecordWebcam)
+    window.api.onMenuRecordScreen(handleMenuRecordScreen)
+
+    return () => {
+      window.api.removeAllListeners('menu-record-webcam')
+      window.api.removeAllListeners('menu-record-screen')
+    }
+  }, [setShowWebcamRecorder, setShowScreenRecorder])
+
   // Listen for quit check - respond with whether we have temp files
   useEffect(() => {
     const handleCheckUnsavedRecordings = (): void => {
@@ -100,42 +119,6 @@ function App(): React.JSX.Element {
           onClose={() => setShowScreenRecorder(false)}
         />
       )}
-
-      {/* TEMPORARY TEST BUTTONS */}
-      <button
-        onClick={() => setShowWebcamRecorder(true)}
-        style={{
-          position: 'fixed',
-          bottom: 20,
-          right: 150,
-          zIndex: 999,
-          padding: '12px 24px',
-          background: '#646cff',
-          color: 'white',
-          border: 'none',
-          borderRadius: '8px',
-          cursor: 'pointer'
-        }}
-      >
-        Test Webcam
-      </button>
-      <button
-        onClick={() => setShowScreenRecorder(true)}
-        style={{
-          position: 'fixed',
-          bottom: 20,
-          right: 20,
-          zIndex: 999,
-          padding: '12px 24px',
-          background: '#ff6b6b',
-          color: 'white',
-          border: 'none',
-          borderRadius: '8px',
-          cursor: 'pointer'
-        }}
-      >
-        Test Screen
-      </button>
     </div>
   )
 }

@@ -548,6 +548,25 @@ app.whenReady().then(async () => {
       ]
     },
     {
+      label: 'Record',
+      submenu: [
+        {
+          label: 'Record Webcam',
+          accelerator: 'CmdOrCtrl+Shift+W',
+          click: () => {
+            mainWindow.webContents.send('menu-record-webcam')
+          }
+        },
+        {
+          label: 'Record Screen',
+          accelerator: 'CmdOrCtrl+Shift+R',
+          click: () => {
+            mainWindow.webContents.send('menu-record-screen')
+          }
+        }
+      ]
+    },
+    {
       label: 'Edit',
       submenu: [
         { role: 'undo' as const },
