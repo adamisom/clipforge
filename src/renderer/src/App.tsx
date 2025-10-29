@@ -56,7 +56,6 @@ function VideoEditor({
   const currentClip = selectedClipId
     ? clips.find((c) => c.id === selectedClipId) || clips[0]
     : clips[0]
-  const totalDuration = clips.reduce((sum, c) => sum + c.timelineDuration, 0)
 
   const handlePlayPause = (): void => {
     setIsPlaying(!isPlaying)
@@ -66,10 +65,18 @@ function VideoEditor({
     setPlayheadPosition(time)
   }
 
-  const handleTrimChange = (newTrimStart: number, newTrimEnd: number): void => {
+  const handleClipSelect = (clipId: string): void => {
+    const selectedClip = clips.find((c) => c.id === clipId)
+    if (selectedClip) {
+      // TODO: Update when we implement multi-clip playback
+      // For now, just update the state
+    }
+  }
+
+  const handleTrimChange = (clipId: string, newTrimStart: number, newTrimEnd: number): void => {
     setClips((prevClips) =>
-      prevClips.map((clip, index) =>
-        index === 0
+      prevClips.map((clip) =>
+        clip.id === clipId
           ? {
               ...clip,
               sourceStartTime: newTrimStart,
@@ -131,12 +138,12 @@ function VideoEditor({
         ) : null}
       </div>
 
-      {/* Temporarily pass first clip data to Timeline */}
+      {/* Multi-clip Timeline */}
       <Timeline
-        duration={totalDuration}
-        trimStart={currentClip ? currentClip.sourceStartTime : 0}
-        trimEnd={currentClip ? currentClip.sourceStartTime + currentClip.timelineDuration : 0}
+        clips={clips}
+        selectedClipId={selectedClipId}
         playheadPosition={playheadPosition}
+        onClipSelect={handleClipSelect}
         onTrimChange={handleTrimChange}
         onPlayheadChange={handlePlayheadChange}
       />

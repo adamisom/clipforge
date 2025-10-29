@@ -170,9 +170,21 @@ body {
   align-items: center;
   padding: 0 8px;
   font-size: 14px;
-  cursor: move;
+  cursor: pointer;
   will-change: transform;
   contain: layout style paint;
+  border: 2px solid transparent;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.timeline-clip:hover {
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.timeline-clip.selected {
+  border-color: #64ff64;
+  box-shadow: 0 0 8px rgba(100, 255, 100, 0.5);
+  background: #5aa0f2;
 }
 
 /* Trim handles */
