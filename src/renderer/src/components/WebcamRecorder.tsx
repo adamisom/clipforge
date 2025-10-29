@@ -5,7 +5,7 @@ interface WebcamRecorderProps {
   onClose: () => void
 }
 
-function WebcamRecorder({ onRecordingComplete, onClose }: WebcamRecorderProps) {
+function WebcamRecorder({ onRecordingComplete, onClose }: WebcamRecorderProps): React.JSX.Element {
   const [stage, setStage] = useState<'preview' | 'countdown' | 'recording'>('preview')
   const [countdown, setCountdown] = useState<number | null>(null)
   const [recordingTime, setRecordingTime] = useState(0)
@@ -177,4 +177,3 @@ function WebcamRecorder({ onRecordingComplete, onClose }: WebcamRecorderProps) {
 }
 
 export default WebcamRecorder
-

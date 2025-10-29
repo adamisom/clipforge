@@ -11,7 +11,7 @@ interface ScreenSourcePickerProps {
   onCancel: () => void
 }
 
-function ScreenSourcePicker({ onSelect, onCancel }: ScreenSourcePickerProps) {
+function ScreenSourcePicker({ onSelect, onCancel }: ScreenSourcePickerProps): React.JSX.Element {
   const [sources, setSources] = useState<ScreenSource[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -61,11 +61,7 @@ function ScreenSourcePicker({ onSelect, onCancel }: ScreenSourcePickerProps) {
 
         <div className="source-grid">
           {sources.map((source) => (
-            <div
-              key={source.id}
-              className="source-item"
-              onClick={() => onSelect(source.id)}
-            >
+            <div key={source.id} className="source-item" onClick={() => onSelect(source.id)}>
               <img src={source.thumbnail} alt={source.name} className="source-thumbnail" />
               <p className="source-name">{source.name}</p>
             </div>
@@ -81,4 +77,3 @@ function ScreenSourcePicker({ onSelect, onCancel }: ScreenSourcePickerProps) {
 }
 
 export default ScreenSourcePicker
-

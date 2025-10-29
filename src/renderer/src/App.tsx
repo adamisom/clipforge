@@ -177,8 +177,6 @@ function App(): React.JSX.Element {
   const [showWebcamRecorder, setShowWebcamRecorder] = useState(false)
   const [showScreenRecorder, setShowScreenRecorder] = useState(false)
 
-  const totalDuration = clips.reduce((sum, clip) => sum + clip.timelineDuration, 0)
-
   const handleWebcamRecordingComplete = async (blob: Blob): Promise<void> => {
     try {
       const arrayBuffer = await blob.arrayBuffer()

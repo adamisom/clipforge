@@ -66,17 +66,20 @@ app.whenReady().then(() => {
 ### DMG Distribution Format (macOS)
 
 **Current Implementation:**
+
 - Only ZIP distribution enabled (DMG disabled due to hdiutil errors)
 - Works fine for testing and internal use
 - Less polished than DMG for end users
 
 **Issue:**
+
 ```bash
-⨯ unable to execute hdiutil  args=["create","-srcfolder",...] 
+⨯ unable to execute hdiutil  args=["create","-srcfolder",...]
 error=Exit code: 1. Command failed: hdiutil create...
 ```
 
 **Why DMG is Better:**
+
 - ✅ Professional installer experience
 - ✅ Drag-to-Applications visual
 - ✅ Standard macOS distribution format
@@ -88,16 +91,18 @@ error=Exit code: 1. Command failed: hdiutil create...
    - Security risk, file ownership issues
 
 2. **Check macOS security settings**
+
    ```bash
    # Check if Full Disk Access needed for build tools
    # System Settings → Privacy & Security → Full Disk Access
    ```
 
 3. **Use different DMG tool**
+
    ```yaml
    # electron-builder.yml
    dmg:
-     format: UDZO  # Try different format
+     format: UDZO # Try different format
      # Or use appdmg instead of hdiutil
    ```
 

@@ -43,4 +43,3 @@ export function closeFloatingRecorder(): void {
 export function getFloatingWindow(): BrowserWindow | null {
   return floatingWindow
 }
-

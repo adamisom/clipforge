@@ -6,7 +6,11 @@ import ffmpeg from 'fluent-ffmpeg'
 import ffmpegInstaller from '@ffmpeg-installer/ffmpeg'
 import ffprobeInstaller from '@ffprobe-installer/ffprobe'
 import fs from 'fs'
-import { initializeOnAppStart, getTempRecordingPath, checkTempDirSize, isTempFile } from './utils/tempFileManager'
+import {
+  initializeOnAppStart,
+  getTempRecordingPath,
+  checkTempDirSize
+} from './utils/tempFileManager'
 import { createFloatingRecorder, closeFloatingRecorder } from './floatingRecorder'
 
 // Set up FFmpeg and FFprobe binary paths (dev vs production)

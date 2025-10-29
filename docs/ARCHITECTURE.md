@@ -557,6 +557,7 @@ webPreferences: {
 **⚠️ CRITICAL SECURITY CONCERN**: This is **NOT production-ready**. See `POST_MVP.md` for migration to custom protocol handler.
 
 **Content Security Policy** (in `index.html`):
+
 ```html
 <meta
   http-equiv="Content-Security-Policy"
@@ -767,7 +768,8 @@ extraResources:
     to: ffprobe
 ```
 
-**Why**: 
+**Why**:
+
 - FFmpeg and FFprobe binaries must be outside `.asar` archive (cannot execute files inside .asar)
 - We bundle **both** binaries separately (not symlinks)
 - Path must match the architecture: `darwin-arm64` for Apple Silicon Macs
