@@ -1,4 +1,4 @@
-# ClipForge Phase 2: Implementation Plan & Task List
+# ClipForge Phase 2: Implementation Plan & Task List (CORRECTED)
 
 **Recording + Multi-Clip Timeline + Split + System Audio**
 
@@ -18,11 +18,15 @@ This phase adds:
 ## Design Decisions
 
 ### Recording UI
-- **Auto-minimize** main window when recording starts
-- **Floating controls** appear with recording indicator and stop button
+- **Floating recorder window** (separate BrowserWindow) during screen recording
+- Main window minimizes when recording starts
+- Floating window shows recording indicator and stop button
 - **3-2-1 countdown** before recording begins
 - **Screen picker** shows thumbnails of available screens/windows
-- **Remember last source** for convenience
+
+⚠️ **Note on Floating Window**: If implementing separate BrowserWindow proves difficult, fallback options:
+- **Option B**: Use built-in Electron overlay API (if available for macOS)
+- **Option C**: Simplified - show recording bar at top of main window (don't minimize)
 
 ### File Handling
 - Record to temp directory initially
@@ -34,32 +38,31 @@ This phase adds:
 ### Multi-Clip Behavior
 - **Append to end** by default (new clips added sequentially)
 - **Clips snap together** (no gaps between clips)
+- **Timeline positions calculated dynamically** from clip order
 - **Auto-play across clips** (continuous playback)
-- **Settings toggle** to pause between clips (future)
 
 ### Split Behavior
 - **Cmd+K** keyboard shortcut (primary method)
-- **Right-click** option (future)
 - **Both pieces** remain on timeline after split
 - **Visual indicator** shows where split will occur
 
 ### Export Options
 - **Single clip**: Simple trim export
-- **Multiple clips**: FFmpeg concat (default)
-- **UI options** for gaps/separate files (future)
+- **Multiple clips**: FFmpeg concat with file list (simpler than complex filter)
 
 ---
 
 ## New State Structure
 
 ```typescript
+// src/renderer/src/types/timeline.ts
+
 interface TimelineClip {
   id: string
   sourceType: 'imported' | 'screen' | 'webcam'
   sourcePath: string
-  sourceStartTime: number  // Trim start in source file
+  sourceStartTime: number  // Trim start in source file (seconds)
   sourceDuration: number   // Full duration of source file
-  timelinePosition: number // Start position on timeline (seconds)
   timelineDuration: number // Duration on timeline (after trim)
   metadata: {
     filename: string
@@ -68,12 +71,20 @@ interface TimelineClip {
   }
 }
 
-interface AppState {
-  clips: TimelineClip[]
-  totalDuration: number
-  playheadPosition: number
-  isPlaying: boolean
+// Note: timelinePosition is CALCULATED, not stored
+// Helper function:
+const calculateClipPositions = (clips: TimelineClip[]): Map<string, number> => {
+  const positions = new Map()
+  let pos = 0
+  for (const clip of clips) {
+    positions.set(clip.id, pos)
+    pos += clip.timelineDuration
+  }
+  return positions
 }
+
+// Calculate total duration (derived state):
+const totalDuration = clips.reduce((sum, clip) => sum + clip.timelineDuration, 0)
 ```
 
 ---
@@ -88,621 +99,1043 @@ interface AppState {
 **📁 Files to modify:**
 - `src/main/index.ts`
 
-**Implementation:**
-- Create utility for managing temp recordings
-- Functions: `initTempDir()`, `cleanupTempDir()`, `getTempRecordingPath()`, `checkTempDirSize()`
-- Max temp size: 5 GB
-- Max file age: 7 days
-- Auto-delete old/unreferenced files on app start
+**Full Implementation Code in `src/main/utils/tempFileManager.ts`:**
+
+```typescript
+import fs from 'fs/promises'
+import path from 'path'
+import { app } from 'electron'
+
+const TEMP_DIR = path.join(app.getPath('temp'), 'clipforge-recordings')
+const MAX_TEMP_SIZE = 5 * 1024 * 1024 * 1024  // 5 GB
+const MAX_FILE_AGE = 7 * 24 * 60 * 60 * 1000  // 7 days
+
+export async function initTempDir(): Promise<void> {
+  await fs.mkdir(TEMP_DIR, { recursive: true })
+}
+
+export async function cleanupTempDir(referencedFiles: string[] = []): Promise<void> {
+  try {
+    const files = await fs.readdir(TEMP_DIR)
+    const now = Date.now()
+    
+    for (const file of files) {
+      const filePath = path.join(TEMP_DIR, file)
+      
+      if (referencedFiles.includes(filePath)) continue
+      
+      const stats = await fs.stat(filePath)
+      
+      if (now - stats.mtime.getTime() > MAX_FILE_AGE) {
+        await fs.unlink(filePath)
+        console.log(\`Deleted old temp file: \${file}\`)
+      }
+    }
+  } catch (err) {
+    console.error('Error cleaning temp dir:', err)
+  }
+}
+
+export async function checkTempDirSize(): Promise<number> {
+  try {
+    const files = await fs.readdir(TEMP_DIR)
+    let totalSize = 0
+    
+    for (const file of files) {
+      const stats = await fs.stat(path.join(TEMP_DIR, file))
+      totalSize += stats.size
+    }
+    
+    return totalSize
+  } catch (err) {
+    console.error('Error checking temp dir size:', err)
+    return 0
+  }
+}
+
+export function getTempRecordingPath(): string {
+  const timestamp = new Date().toISOString().replace(/:/g, '-').split('.')[0]
+  return path.join(TEMP_DIR, \`clipforge-recording-\${timestamp}.webm\`)
+}
+
+export function isTempFile(filePath: string): boolean {
+  return filePath.includes('clipforge-recordings')
+}
+
+export async function initializeOnAppStart(referencedFiles: string[]): Promise<void> {
+  await initTempDir()
+  await cleanupTempDir(referencedFiles)
+  
+  const size = await checkTempDirSize()
+  if (size > MAX_TEMP_SIZE) {
+    console.warn(\`Temp dir size (\${(size / 1024 / 1024 / 1024).toFixed(2)} GB) exceeds limit\`)
+  }
+}
+```
+
+**Modifications to `src/main/index.ts`:**
+
+Add import at top:
+```typescript
+import { initializeOnAppStart } from './utils/tempFileManager'
+```
+
+Add in `app.whenReady()` BEFORE `createWindow()`:
+```typescript
+app.whenReady().then(async () => {
+  await initializeOnAppStart([])
+  
+  electronApp.setAppUserModelId('com.electron')
+  // ... rest
+```
 
 **🧪 CHECKPOINT A.1:**
-- Run app → verify `/tmp/clipforge-recordings/` directory created
-- Check console for no errors
+- Run app: `npm run dev`
+- Check `/tmp/clipforge-recordings/` directory exists
+- Console should show no errors
 
 ---
 
-## ✅ TASK A.2: Add IPC Handler for Saving Blobs
+## ✅ TASK A.2: Add IPC Handlers for Saving Blobs
 
 **📁 Files to modify:**
 - `src/main/index.ts`
 - `src/preload/index.ts`
 - `src/preload/index.d.ts`
 
-**Implementation:**
-- `save-recording-blob`: Save ArrayBuffer to temp directory
-- `save-recording-permanent`: Show save dialog, move from temp to permanent location
-- Check temp dir size before saving
+**Add to `src/main/index.ts` (after existing IPC handlers):**
+
+Add imports:
+```typescript
+import { getTempRecordingPath, checkTempDirSize } from './utils/tempFileManager'
+import fs from 'fs'
+```
+
+Add handlers:
+```typescript
+  // Save recording blob to temp
+  ipcMain.handle('save-recording-blob', async (_event, arrayBuffer: ArrayBuffer) => {
+    try {
+      const size = await checkTempDirSize()
+      const MAX_SIZE = 5 * 1024 * 1024 * 1024
+      
+      if (size + arrayBuffer.byteLength > MAX_SIZE) {
+        throw new Error('Temp directory size limit exceeded. Please save existing recordings.')
+      }
+      
+      const tempPath = getTempRecordingPath()
+      const buffer = Buffer.from(arrayBuffer)
+      
+      await fs.promises.writeFile(tempPath, buffer)
+      console.log('Recording saved to temp:', tempPath)
+      
+      return tempPath
+    } catch (err) {
+      console.error('Error saving recording:', err)
+      throw err
+    }
+  })
+
+  // Save recording to permanent location
+  ipcMain.handle('save-recording-permanent', async (_event, tempPath: string) => {
+    const timestamp = new Date().toISOString().replace(/:/g, '-').split('.')[0]
+    const result = await dialog.showSaveDialog({
+      defaultPath: \`clipforge-recording-\${timestamp}.webm\`,
+      filters: [{ name: 'WebM Video', extensions: ['webm'] }]
+    })
+    
+    if (result.canceled || !result.filePath) {
+      return { saved: false, path: tempPath }
+    }
+    
+    try {
+      await fs.promises.copyFile(tempPath, result.filePath)
+      await fs.promises.unlink(tempPath)
+      return { saved: true, path: result.filePath }
+    } catch (err) {
+      console.error('Error moving recording:', err)
+      throw err
+    }
+  })
+```
+
+**Add to `src/preload/index.ts`:**
+```typescript
+  saveRecordingBlob: (arrayBuffer: ArrayBuffer) => ipcRenderer.invoke('save-recording-blob', arrayBuffer),
+  saveRecordingPermanent: (tempPath: string) => ipcRenderer.invoke('save-recording-permanent', tempPath)
+```
+
+**Add to `src/preload/index.d.ts`:**
+```typescript
+    saveRecordingBlob: (arrayBuffer: ArrayBuffer) => Promise<string>
+    saveRecordingPermanent: (tempPath: string) => Promise<{ saved: boolean; path: string }>
+```
 
 **🧪 CHECKPOINT A.2:**
-- Test in DevTools: `await window.api.saveRecordingBlob(new ArrayBuffer(100))`
-- Should return temp file path
+- Run app, open DevTools
+- Test: `await window.api.saveRecordingBlob(new ArrayBuffer(100))`
+- Should return path like `/tmp/clipforge-recordings/clipforge-recording-2025-10-29T14-30-00.webm`
 
 ---
 
-# 🟢 PHASE B: Webcam Recording
+# 🟢 PHASE B: State Migration & Webcam Recording
 
-## ✅ TASK B.1: Create Recording State & Types
+## ✅ TASK B.0: Migrate to Multi-Clip State (DO THIS FIRST!)
 
 **📁 Files to create:**
 - `src/renderer/src/types/timeline.ts`
 
-**Implementation:**
-- Define `TimelineClip`, `RecordingState`, `AppState` interfaces
+**📁 Files to modify:**
+- `src/renderer/src/App.tsx`
+- `src/renderer/src/components/ExportButton.tsx`
 
-**🧪 CHECKPOINT B.1:**
-- Verify TypeScript compiles: `npm run build`
+**Create `src/renderer/src/types/timeline.ts`:**
+```typescript
+export interface TimelineClip {
+  id: string
+  sourceType: 'imported' | 'screen' | 'webcam'
+  sourcePath: string
+  sourceStartTime: number
+  sourceDuration: number
+  timelineDuration: number
+  metadata: {
+    filename: string
+    resolution: string
+    codec: string
+  }
+}
+```
+
+**Modify `src/renderer/src/App.tsx`:**
+
+Replace state:
+```typescript
+// REMOVE old VideoState
+
+// ADD new state:
+import { TimelineClip } from './types/timeline'
+
+const [clips, setClips] = useState<TimelineClip[]>([])
+const [playheadPosition, setPlayheadPosition] = useState(0)
+const [isPlaying, setIsPlaying] = useState(false)
+
+const totalDuration = clips.reduce((sum, clip) => sum + clip.timelineDuration, 0)
+
+const generateClipId = (): string => {
+  return \`clip-\${Date.now()}-\${Math.random().toString(36).substr(2, 9)}\`
+}
+```
+
+Update `handleImport`:
+```typescript
+const handleImport = useCallback(async (): Promise<void> => {
+  try {
+    const filePath = await window.api.selectVideoFile()
+    if (!filePath) return
+
+    const metadata = await window.api.getVideoMetadata(filePath)
+
+    const newClip: TimelineClip = {
+      id: generateClipId(),
+      sourceType: 'imported',
+      sourcePath: filePath,
+      sourceStartTime: 0,
+      sourceDuration: metadata.duration,
+      timelineDuration: metadata.duration,
+      metadata: {
+        filename: metadata.filename,
+        resolution: \`\${metadata.width}x\${metadata.height}\`,
+        codec: metadata.codec
+      }
+    }
+
+    setClips(prev => [...prev, newClip])
+  } catch (error) {
+    console.error('Import failed:', error)
+    alert(\`Failed to import video: \${error}\`)
+  }
+}, [])
+```
+
+Update WelcomeScreen condition:
+```typescript
+{clips.length === 0 ? (
+  <WelcomeScreen onImport={handleImport} isDragging={isDragging} />
+) : (
+  <VideoEditor 
+    clips={clips}
+    setClips={setClips}
+    playheadPosition={playheadPosition}
+    setPlayheadPosition={setPlayheadPosition}
+    isPlaying={isPlaying}
+    setIsPlaying={setIsPlaying}
+  />
+)}
+```
+
+**Modify `src/renderer/src/components/ExportButton.tsx`:**
+
+```typescript
+interface ExportButtonProps {
+  hasClips: boolean
+  onExport: () => void
+  isExporting?: boolean
+}
+
+function ExportButton({ hasClips, onExport, isExporting = false }: ExportButtonProps) {
+  const isDisabled = !hasClips || isExporting
+
+  return (
+    <button
+      onClick={onExport}
+      disabled={isDisabled}
+      className="export-button"
+    >
+      {isExporting ? 'Exporting...' : 'Export Timeline'}
+    </button>
+  )
+}
+```
+
+**Update VideoEditor (temporary - will refactor later):**
+```typescript
+function VideoEditor({
+  clips,
+  setClips,
+  playheadPosition,
+  setPlayheadPosition,
+  isPlaying,
+  setIsPlaying
+}: {
+  clips: TimelineClip[]
+  setClips: React.Dispatch<React.SetStateAction<TimelineClip[]>>
+  playheadPosition: number
+  setPlayheadPosition: (pos: number) => void
+  isPlaying: boolean
+  setIsPlaying: (playing: boolean) => void
+}): React.JSX.Element {
+  
+  // For now, just show first clip
+  const currentClip = clips[0]
+  const totalDuration = clips.reduce((sum, c) => sum + c.timelineDuration, 0)
+  
+  // ... existing VideoEditor code, but use currentClip instead of videoState
+  
+  return (
+    <div className="video-editor">
+      <div className="preview-panel">
+        {currentClip ? (
+          <VideoPreview
+            sourcePath={currentClip.sourcePath}
+            trimStart={currentClip.sourceStartTime}
+            trimEnd={currentClip.sourceStartTime + currentClip.timelineDuration}
+            playheadPosition={playheadPosition}
+            isPlaying={isPlaying}
+            onPlayPause={() => setIsPlaying(!isPlaying)}
+            onTimeUpdate={(time) => setPlayheadPosition(time)}
+          />
+        ) : null}
+      </div>
+      
+      {/* Keep existing Timeline and info panel */}
+      
+      <ExportButton
+        hasClips={clips.length > 0}
+        onExport={() => {/* will implement later */}}
+      />
+    </div>
+  )
+}
+```
+
+**🧪 CHECKPOINT B.0:**
+- App compiles with TypeScript
+- Import one video → should work
+- Clip appears in timeline (might look same as before)
+- console.log(clips) → should show array with one clip
 
 ---
 
-## ✅ TASK B.2: Create Webcam Recording Component
+## ✅ TASK B.1: Create Webcam Recording Component
 
 **📁 Files to create:**
 - `src/renderer/src/components/WebcamRecorder.tsx`
 
-**Implementation:**
-- Request webcam via `getUserMedia`
-- Show live preview
-- 3-2-1 countdown before recording
-- Use `MediaRecorder` to capture
-- Recording indicator with timer
-- Stop button to end recording
+**Full implementation:** (See original plan for full code - it's correct)
 
-**🧪 CHECKPOINT B.2:**
-- Create temp test in App.tsx
-- Webcam preview should appear
-- Recording should work with countdown
+Key points:
+- Use `navigator.mediaDevices.getUserMedia({ video: true, audio: true })`
+- 3-2-1 countdown with state management
+- `MediaRecorder` with `ondataavailable` and `onstop`
+- Return blob via `onRecordingComplete` callback
 
----
-
-## ✅ TASK B.3: Add Webcam Recording Styles
-
-**📁 Files to modify:**
-- `src/renderer/src/assets/main.css`
-
-**Implementation:**
-- Modal styles for recorder
-- Countdown animation
-- Recording indicator with blinking red dot
-- Button styles
-
-**🧪 CHECKPOINT B.3:**
-- Verify styles look polished
-- Countdown animation smooth
+**🧪 CHECKPOINT B.1:**
+- Create temp test to render component
+- Webcam preview should show
+- Countdown should work
+- Recording should capture
 
 ---
 
-## ✅ TASK B.4: Integrate Webcam Recorder into App
+## ✅ TASK B.2: Add Webcam Recording Styles
+
+(See original - styles are correct)
+
+---
+
+## ✅ TASK B.3: Integrate Webcam Recorder into App
 
 **📁 Files to modify:**
 - `src/renderer/src/App.tsx`
 
-**Implementation:**
-- Add state: `showWebcamRecorder`
-- Handler: `handleWebcamRecordingComplete`
-  - Save blob to temp
-  - Prompt for permanent save
-  - Get metadata
-  - Add to clips array (replaces single video for now)
-- Render `<WebcamRecorder>` modal
-- Add test button
+Add state:
+```typescript
+const [showWebcamRecorder, setShowWebcamRecorder] = useState(false)
+```
 
-**🧪 CHECKPOINT B.4:**
+Add handler:
+```typescript
+const handleWebcamRecordingComplete = async (blob: Blob): Promise<void> => {
+  try {
+    const arrayBuffer = await blob.arrayBuffer()
+    const tempPath = await window.api.saveRecordingBlob(arrayBuffer)
+    
+    const result = await window.api.saveRecordingPermanent(tempPath)
+    const finalPath = result.path
+    
+    const metadata = await window.api.getVideoMetadata(finalPath)
+    
+    const newClip: TimelineClip = {
+      id: generateClipId(),
+      sourceType: 'webcam',
+      sourcePath: finalPath,
+      sourceStartTime: 0,
+      sourceDuration: metadata.duration,
+      timelineDuration: metadata.duration,
+      metadata: {
+        filename: metadata.filename,
+        resolution: \`\${metadata.width}x\${metadata.height}\`,
+        codec: metadata.codec
+      }
+    }
+
+    setClips(prev => [...prev, newClip])
+    setShowWebcamRecorder(false)
+  } catch (error) {
+    console.error('Failed to save recording:', error)
+    alert(\`Failed to save recording: \${error}\`)
+    setShowWebcamRecorder(false)
+  }
+}
+```
+
+Render modal:
+```typescript
+{showWebcamRecorder && (
+  <WebcamRecorder
+    onRecordingComplete={handleWebcamRecordingComplete}
+    onClose={() => setShowWebcamRecorder(false)}
+  />
+)}
+```
+
+Add test button:
+```typescript
+<button
+  onClick={() => setShowWebcamRecorder(true)}
+  style={{ position: 'fixed', bottom: 20, right: 20, zIndex: 999 }}
+>
+  Test Webcam
+</button>
+```
+
+**🧪 CHECKPOINT B.3:**
 - Click test button → record webcam
-- Save dialog appears after recording
-- Recording added to timeline
+- Save dialog appears
+- Recording added to clips array
+- Verify with console.log(clips)
 
 ---
 
-# 🟢 PHASE C: Screen Recording with System Audio
+# 🟢 PHASE C: Screen Recording with Floating Window
 
 ## ✅ TASK C.1: Add IPC Handler for Screen Sources
+
+(See original - code is correct)
+
+---
+
+## ✅ TASK C.2-C.3: Create Screen Source Picker
+
+(See original - code is correct)
+
+---
+
+## ✅ TASK C.4: Create Floating Recorder Window Infrastructure
+
+**📁 Files to create:**
+- `src/main/floatingRecorder.ts`
+- `src/renderer/floating-recorder.html`
+- `src/renderer/src/FloatingRecorder.tsx`
 
 **📁 Files to modify:**
 - `src/main/index.ts`
 - `src/preload/index.ts`
 - `src/preload/index.d.ts`
 
-**Implementation:**
-- `get-screen-sources`: Use `desktopCapturer.getSources()`
-- Return array with id, name, thumbnail (base64)
+⚠️ **This is the complex part - if trouble is encountered, consider:**
+- **Option B**: Check if Electron has overlay API for macOS
+- **Option C**: Simplify to just show recording bar at top of main window (no minimize)
 
-**🧪 CHECKPOINT C.1:**
-- Test: `await window.api.getScreenSources()`
-- Should return sources with thumbnails
+**Create `src/main/floatingRecorder.ts`:**
+
+```typescript
+import { BrowserWindow } from 'electron'
+import { join } from 'path'
+import { is } from '@electron-toolkit/utils'
+
+let floatingWindow: BrowserWindow | null = null
+
+export function createFloatingRecorder(): void {
+  if (floatingWindow) return
+
+  floatingWindow = new BrowserWindow({
+    width: 320,
+    height: 100,
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    resizable: false,
+    skipTaskbar: true,
+    webPreferences: {
+      preload: join(__dirname, '../preload/index.js'),
+      contextIsolation: true,
+      nodeIntegration: false
+    }
+  })
+
+  if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
+    floatingWindow.loadURL(\`\${process.env['ELECTRON_RENDERER_URL']}/floating-recorder.html\`)
+  } else {
+    floatingWindow.loadFile(join(__dirname, '../renderer/floating-recorder.html'))
+  }
+
+  floatingWindow.on('closed', () => {
+    floatingWindow = null
+  })
+}
+
+export function updateFloatingRecorderTime(seconds: number): void {
+  if (floatingWindow) {
+    floatingWindow.webContents.send('recording-time-update', seconds)
+  }
+}
+
+export function closeFloatingRecorder(): void {
+  if (floatingWindow) {
+    floatingWindow.close()
+    floatingWindow = null
+  }
+}
+
+export function getFloatingWindow(): BrowserWindow | null {
+  return floatingWindow
+}
+```
+
+**Add IPC handlers in `src/main/index.ts`:**
+
+```typescript
+import { createFloatingRecorder, closeFloatingRecorder, updateFloatingRecorderTime } from './floatingRecorder'
+
+  ipcMain.handle('start-floating-recorder', () => {
+    createFloatingRecorder()
+    const mainWindow = BrowserWindow.getAllWindows().find(w => !w.isAlwaysOnTop())
+    if (mainWindow) mainWindow.minimize()
+  })
+
+  ipcMain.handle('stop-floating-recorder', () => {
+    closeFloatingRecorder()
+    const mainWindow = BrowserWindow.getAllWindows().find(w => !w.isAlwaysOnTop())
+    if (mainWindow) {
+      mainWindow.restore()
+      mainWindow.focus()
+    }
+  })
+
+  ipcMain.handle('stop-recording-from-floating', () => {
+    // Send event to main window to stop recording
+    const mainWindow = BrowserWindow.getAllWindows().find(w => !w.isAlwaysOnTop())
+    if (mainWindow) {
+      mainWindow.webContents.send('stop-recording')
+    }
+  })
+```
+
+**Create `src/renderer/floating-recorder.html`:**
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Recording</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: transparent;
+      -webkit-app-region: drag;
+      font-family: system-ui, -apple-system, sans-serif;
+    }
+    .floating-recorder {
+      background: rgba(0, 0, 0, 0.9);
+      border-radius: 24px;
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      backdrop-filter: blur(10px);
+    }
+    .recording-indicator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: white;
+    }
+    .recording-dot {
+      color: #ff3b30;
+      font-size: 16px;
+      animation: blink 1s infinite;
+    }
+    @keyframes blink {
+      0%, 50% { opacity: 1; }
+      51%, 100% { opacity: 0; }
+    }
+    .stop-button {
+      -webkit-app-region: no-drag;
+      background: #ff3b30;
+      color: white;
+      border: none;
+      padding: 6px 16px;
+      border-radius: 16px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="floating-recorder">
+    <div class="recording-indicator">
+      <span class="recording-dot">●</span>
+      <span id="time">0:00</span>
+    </div>
+    <button class="stop-button" onclick="stopRecording()">Stop</button>
+  </div>
+  <script>
+    let seconds = 0
+    setInterval(() => {
+      seconds++
+      const mins = Math.floor(seconds / 60)
+      const secs = seconds % 60
+      document.getElementById('time').textContent = \`\${mins}:\${secs.toString().padStart(2, '0')}\`
+    }, 1000)
+
+    function stopRecording() {
+      window.api.stopRecordingFromFloating()
+    }
+  </script>
+</body>
+</html>
+```
+
+**Add to preload API:**
+```typescript
+  startFloatingRecorder: () => ipcRenderer.invoke('start-floating-recorder'),
+  stopFloatingRecorder: () => ipcRenderer.invoke('stop-floating-recorder'),
+  stopRecordingFromFloating: () => ipcRenderer.invoke('stop-recording-from-floating'),
+  onStopRecording: (callback) => ipcRenderer.on('stop-recording', callback)
+```
+
+**🧪 CHECKPOINT C.4:**
+- Test floating window creation independently
+- Should appear as small window at top
+- Should stay on top of all windows
+- Stop button should be clickable
 
 ---
 
-## ✅ TASK C.2: Create Screen Source Picker Component
-
-**📁 Files to create:**
-- `src/renderer/src/components/ScreenSourcePicker.tsx`
-
-**Implementation:**
-- Grid of available screens/windows
-- Show thumbnails
-- Click to select
-- "Start Recording" button
-
-**🧪 CHECKPOINT C.2:**
-- Should see grid of sources
-- Clicking should select
-- Multiple monitors should show
-
----
-
-## ✅ TASK C.3: Add Screen Source Picker Styles
-
-**📁 Files to modify:**
-- `src/renderer/src/assets/main.css`
-
-**Implementation:**
-- Grid layout for sources
-- Selected state styling
-- Hover effects
-
-**🧪 CHECKPOINT C.3:**
-- Verify responsive grid
-- Selected state clear
-
----
-
-## ✅ TASK C.4: Create Screen Recorder Component
+## ✅ TASK C.5: Create Screen Recorder Component with Floating Integration
 
 **📁 Files to create:**
 - `src/renderer/src/components/ScreenRecorder.tsx`
 
-**Implementation:**
-- Show `ScreenSourcePicker` initially
-- Request screen stream with system audio
-- 3-2-1 countdown
-- Floating controls during recording
-- Stop button
+```typescript
+import { useState, useRef, useEffect } from 'react'
+import ScreenSourcePicker from './ScreenSourcePicker'
 
-**🧪 CHECKPOINT C.4:**
-- Select screen → countdown → recording starts
-- Floating controls visible
-- Stop recording works
+interface ScreenRecorderProps {
+  onRecordingComplete: (blob: Blob) => void
+  onClose: () => void
+}
 
----
+function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps) {
+  const [stage, setStage] = useState<'picker' | 'countdown' | 'recording'>('picker')
+  const [countdown, setCountdown] = useState<number | null>(null)
+  const [stream, setStream] = useState<MediaStream | null>(null)
+  
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const chunksRef = useRef<Blob[]>([])
 
-## ✅ TASK C.5: Add Screen Recorder Styles
+  const handleSourceSelect = async (sourceId: string): Promise<void> => {
+    try {
+      const constraints: any = {
+        audio: {
+          mandatory: {
+            chromeMediaSource: 'desktop',
+            chromeMediaSourceId: sourceId
+          }
+        },
+        video: {
+          mandatory: {
+            chromeMediaSource: 'desktop',
+            chromeMediaSourceId: sourceId
+          }
+        }
+      }
 
-**📁 Files to modify:**
-- `src/renderer/src/assets/main.css`
+      const mediaStream = await navigator.mediaDevices.getUserMedia(constraints)
+      setStream(mediaStream)
+      
+      setStage('countdown')
+      setCountdown(3)
+      
+      const countdownInterval = setInterval(() => {
+        setCountdown(prev => {
+          if (prev === null || prev <= 1) {
+            clearInterval(countdownInterval)
+            beginRecording(mediaStream)
+            return null
+          }
+          return prev - 1
+        })
+      }, 1000)
+      
+    } catch (err) {
+      console.error('Screen recording error:', err)
+      alert('Failed to start screen recording')
+      onClose()
+    }
+  }
 
-**Implementation:**
-- Fullscreen countdown overlay
-- Floating recorder controls (top-center)
-- Always-on-top styling
+  const beginRecording = async (mediaStream: MediaStream): Promise<void> => {
+    try {
+      // Start floating recorder window
+      await window.api.startFloatingRecorder()
+      
+      const mediaRecorder = new MediaRecorder(mediaStream, { mimeType: 'video/webm;codecs=vp9' })
+      
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          chunksRef.current.push(event.data)
+        }
+      }
+      
+      mediaRecorder.onstop = async () => {
+        const blob = new Blob(chunksRef.current, { type: 'video/webm' })
+        await window.api.stopFloatingRecorder()
+        onRecordingComplete(blob)
+      }
+      
+      mediaRecorder.start(1000)
+      mediaRecorderRef.current = mediaRecorder
+      setStage('recording')
+    } catch (err) {
+      console.error('Recording start error:', err)
+      alert('Failed to start recording')
+      onClose()
+    }
+  }
+
+  // Listen for stop event from floating window
+  useEffect(() => {
+    const handleStop = () => {
+      if (mediaRecorderRef.current && stage === 'recording') {
+        mediaRecorderRef.current.stop()
+        if (stream) {
+          stream.getTracks().forEach(track => track.stop())
+        }
+      }
+    }
+
+    window.api.onStopRecording(handleStop)
+
+    return () => {
+      window.api.removeAllListeners('stop-recording')
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop())
+      }
+    }
+  }, [stage, stream])
+
+  if (stage === 'picker') {
+    return <ScreenSourcePicker onSelect={handleSourceSelect} onCancel={onClose} />
+  }
+
+  if (stage === 'countdown' && countdown !== null) {
+    return (
+      <div className="countdown-overlay fullscreen">
+        <div className="countdown-number">{countdown}</div>
+        <p>Get ready to record...</p>
+      </div>
+    )
+  }
+
+  // During recording, render nothing (floating window handles UI)
+  return null
+}
+
+export default ScreenRecorder
+```
 
 **🧪 CHECKPOINT C.5:**
-- Floating controls at top center
-- Styles modern and polished
+- Select screen source
+- Countdown should show
+- Main window minimizes
+- Floating window appears
+- Recording captures screen
+- Stop button works
 
 ---
 
 ## ✅ TASK C.6: Integrate Screen Recorder into App
 
-**📁 Files to modify:**
-- `src/renderer/src/App.tsx`
+Similar to webcam integration but for screen:
 
-**Implementation:**
-- Add state: `showScreenRecorder`
-- Handler: `handleScreenRecordingComplete`
-- Render `<ScreenRecorder>` modal
-- Add test button
+```typescript
+const handleScreenRecordingComplete = async (blob: Blob): Promise<void> => {
+  try {
+    const arrayBuffer = await blob.arrayBuffer()
+    const tempPath = await window.api.saveRecordingBlob(arrayBuffer)
+    
+    const result = await window.api.saveRecordingPermanent(tempPath)
+    const finalPath = result.path
+    
+    const metadata = await window.api.getVideoMetadata(finalPath)
+    
+    const newClip: TimelineClip = {
+      id: generateClipId(),
+      sourceType: 'screen',
+      sourcePath: finalPath,
+      sourceStartTime: 0,
+      sourceDuration: metadata.duration,
+      timelineDuration: metadata.duration,
+      metadata: {
+        filename: metadata.filename,
+        resolution: \`\${metadata.width}x\${metadata.height}\`,
+        codec: metadata.codec
+      }
+    }
+
+    setClips(prev => [...prev, newClip])
+    setShowScreenRecorder(false)
+  } catch (error) {
+    console.error('Failed to save screen recording:', error)
+    alert(\`Failed to save recording: \${error}\`)
+    setShowScreenRecorder(false)
+  }
+}
+```
 
 **🧪 CHECKPOINT C.6:**
-- Click test button → select screen
-- Recording should work
-- Save dialog appears
+- Full screen recording workflow works
+- Recording added to clips array
+- Can record multiple clips
 
 ---
 
-## ✅ TASK C.7: Implement App Minimize During Recording
+# 🟢 PHASE D-H: (Remaining phases follow original plan with corrections noted below)
 
-**📁 Files to modify:**
-- `src/main/index.ts`
-- `src/preload/index.ts`
-- `src/preload/index.d.ts`
-- `src/renderer/src/components/ScreenRecorder.tsx`
+## Key Corrections for Remaining Phases:
 
-**Implementation:**
-- IPC handlers: `minimize-window`, `restore-window`
-- Call minimize when recording starts
-- Call restore when recording stops
-- Floating controls remain visible
+### D.3 - Timeline Position Calculation:
+```typescript
+// In Timeline.tsx, calculate positions dynamically:
+const clipPositions = useMemo(() => {
+  const positions = new Map<string, number>()
+  let pos = 0
+  for (const clip of clips) {
+    positions.set(clip.id, pos)
+    pos += clip.timelineDuration
+  }
+  return positions
+}, [clips])
 
-**🧪 CHECKPOINT C.7:**
-- Start screen recording
-- Main window should minimize after countdown
-- Floating controls remain clickable
-- Stop recording → window restores
+// Use in TimelineClip:
+<TimelineClip
+  clip={clip}
+  position={clipPositions.get(clip.id) || 0}
+  pixelsPerSecond={pixelsPerSecond}
+/>
+```
 
----
+### F.1 - Split Function (CORRECTED):
+```typescript
+const handleSplitClip = (): void => {
+  if (!currentClip) return
+  
+  const posInClip = getPositionInClip(currentClip)
+  
+  if (posInClip < 0.1 || posInClip > currentClip.timelineDuration - 0.1) {
+    alert('Cannot split near clip edges')
+    return
+  }
+  
+  setClips(prevClips => {
+    const clipIndex = prevClips.findIndex(c => c.id === currentClip.id)
+    if (clipIndex === -1) return prevClips
+    
+    const leftClip: TimelineClip = {
+      ...currentClip,
+      id: generateClipId(),
+      timelineDuration: posInClip
+    }
+    
+    const rightClip: TimelineClip = {
+      ...currentClip,
+      id: generateClipId(),
+      sourceStartTime: currentClip.sourceStartTime + posInClip,
+      timelineDuration: currentClip.timelineDuration - posInClip
+    }
+    
+    // Replace clip at index with two new clips
+    const newClips = [
+      ...prevClips.slice(0, clipIndex),
+      leftClip,
+      rightClip,
+      ...prevClips.slice(clipIndex + 1)
+    ]
+    
+    return newClips
+  })
+}
+```
 
-# 🟢 PHASE D: Multi-Clip Timeline State Refactor
+### G.1 - FFmpeg Export (SIMPLIFIED):
+```typescript
+ipcMain.handle('export-multi-clip', async (_event, { clips, outputPath }) => {
+  const mainWindow = BrowserWindow.getAllWindows()[0]
+  
+  // Create concat file list
+  const concatFilePath = path.join(os.tmpdir(), 'clipforge-concat.txt')
+  let concatContent = ''
+  
+  for (const clip of clips) {
+    concatContent += \`file '\${clip.sourcePath}'\n\`
+    concatContent += \`inpoint \${clip.sourceStartTime}\n\`
+    concatContent += \`outpoint \${clip.sourceStartTime + clip.timelineDuration}\n\`
+  }
+  
+  await fs.promises.writeFile(concatFilePath, concatContent)
+  
+  return new Promise((resolve, reject) => {
+    ffmpeg()
+      .input(concatFilePath)
+      .inputOptions(['-f concat', '-safe 0'])
+      .outputOptions(['-c copy'])  // Fast, no re-encode
+      .output(outputPath)
+      .on('progress', (progress) => {
+        mainWindow.webContents.send('export-progress', progress)
+      })
+      .on('end', () => {
+        fs.promises.unlink(concatFilePath).catch(() => {})
+        mainWindow.webContents.send('export-complete')
+        resolve({ success: true })
+      })
+      .on('error', (err) => {
+        fs.promises.unlink(concatFilePath).catch(() => {})
+        mainWindow.webContents.send('export-error', { message: err.message })
+        reject(err)
+      })
+      .run()
+  })
+})
+```
 
-## ✅ TASK D.1: Migrate State from Single Video to Multi-Clip
+### H.1 - App Quit Handler (FIXED):
+```typescript
+let quitting = false
 
-**📁 Files to modify:**
-- `src/renderer/src/App.tsx`
-
-**Implementation:**
-- Replace `VideoState` with multi-clip structure
-- `clips: TimelineClip[]`, `playheadPosition`, `isPlaying`
-- Helper: `generateClipId()`
-- Update `handleImport` to add to clips array
-- Update recording handlers to add to clips array
-- Update WelcomeScreen condition: `clips.length === 0`
-- Calculate `totalDuration` from clips
-
-**🧪 CHECKPOINT D.1:**
-- Multiple imports add multiple clips
-- Console.log clips array to verify structure
-
----
-
-## ✅ TASK D.2: Update VideoEditor for Multi-Clip
-
-**📁 Files to modify:**
-- `src/renderer/src/App.tsx` (VideoEditor function)
-
-**Implementation:**
-- Update props: `clips`, `setClips`, etc.
-- Helper: `getClipAtPosition()` - find clip at playhead
-- Helper: `getPositionInClip()` - position within current clip
-- Update `handleTimeUpdate` for clip transitions
-- Update `handleTrimChange` for clip-specific trim
-- Update info panel to show clip count
-- Add "+ Add Clip" button
-
-**🧪 CHECKPOINT D.2:**
-- App compiles and runs
-- Info panel shows "Clips: 1"
-- Timeline will have errors (fix in next task)
-
----
-
-## ✅ TASK D.3: Update Timeline for Multi-Clip
-
-**📁 Files to create:**
-- `src/renderer/src/components/TimelineClip.tsx`
-
-**📁 Files to modify:**
-- `src/renderer/src/components/Timeline.tsx`
-
-**Implementation:**
-- Create `TimelineClip` component:
-  - Individual clip visualization
-  - Trim handles per clip
-  - Selection state
-  - Type icon (🖥️ 📹 📁)
-- Update `Timeline` component:
-  - Map over clips array
-  - Render `<TimelineClip>` for each
-  - Pass `pixelsPerSecond` to each
-  - Handle clip selection
-
-**🧪 CHECKPOINT D.3:**
-- Import 2-3 clips → all appear side-by-side
-- Each clip independently trimmable
-- Clicking clip selects it
-- Playhead moves across all clips
-
----
-
-## ✅ TASK D.4: Add Multi-Clip Timeline Styles
-
-**📁 Files to modify:**
-- `src/renderer/src/assets/main.css`
-- `src/renderer/src/components/TimelineClip.tsx`
-
-**Implementation:**
-- Different colors per clip type:
-  - Screen: Purple gradient
-  - Webcam: Pink gradient
-  - Imported: Blue gradient
-- Selected state: Gold border
-- Hover effects
-- Clip icons
-
-**🧪 CHECKPOINT D.4:**
-- Different clip types have different colors
-- Selected clip has gold border
-- Hover effects work
-
----
-
-# 🟢 PHASE E: Multi-Clip Playback
-
-## ✅ TASK E.1: Implement Automatic Clip Transitions
-
-**📁 Files to modify:**
-- `src/renderer/src/components/VideoPreview.tsx`
-
-**Implementation:**
-- Detect when video source changes
-- Handle `onTimeUpdate` to check for clip end
-- Notify parent when clip boundary reached
-- Update video `src` when clip changes
-- Handle seeking across clip boundaries
-
-**🧪 CHECKPOINT E.1:**
-- Load 2 clips
-- Press play
-- Should automatically transition from clip 1 to clip 2
-- (May have brief pause at transition)
-
----
-
-## ✅ TASK E.2: Handle Clip Boundary Transitions in VideoEditor
-
-**📁 Files to modify:**
-- `src/renderer/src/App.tsx` (VideoEditor function)
-
-**Implementation:**
-- Update `handleTimeUpdate`:
-  - Detect when reached end of current clip
-  - Move playhead to start of next clip
-  - If no next clip, stop playback
-- Handle edge cases (end of timeline)
-
-**🧪 CHECKPOINT E.2:**
-- Load 2+ clips
-- Press play
-- Should play through all clips automatically
-- Should stop at end of last clip
-
----
-
-# 🟢 PHASE F: Split Functionality
-
-## ✅ TASK F.1: Add Split Function
-
-**📁 Files to modify:**
-- `src/renderer/src/App.tsx` (VideoEditor function)
-
-**Implementation:**
-- Function: `handleSplitClip()`
-  - Find current clip at playhead
-  - Calculate position within clip
-  - Create two new clips (left and right pieces)
-  - Update clips array
-- Keyboard shortcut: Cmd+K
-- Add split button in preview panel
-- Don't split near edges (<0.1s from start/end)
-
-**🧪 CHECKPOINT F.1:**
-- Load a clip
-- Move playhead to middle
-- Press Cmd+K or click Split button
-- Clip splits into two pieces
-- Both pieces playable
+app.on('before-quit', async (e) => {
+  if (quitting) return
+  
+  e.preventDefault()
+  
+  const mainWindow = BrowserWindow.getAllWindows().find(w => !w.isAlwaysOnTop())
+  if (!mainWindow) {
+    quitting = true
+    app.quit()
+    return
+  }
+  
+  // Check for temp files with timeout
+  const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(false), 2000))
+  
+  const checkPromise = new Promise((resolve) => {
+    mainWindow.webContents.send('check-unsaved-recordings')
+    ipcMain.once('unsaved-recordings-response', (_event, { hasTempFiles }) => {
+      resolve(hasTempFiles)
+    })
+  })
+  
+  const hasTempFiles = await Promise.race([checkPromise, timeoutPromise])
+  
+  if (hasTempFiles) {
+    const response = await dialog.showMessageBox(mainWindow, {
+      type: 'warning',
+      buttons: ['Quit Anyway', 'Cancel'],
+      defaultId: 1,
+      title: 'Unsaved Recordings',
+      message: 'You have unsaved recordings in temporary storage.',
+      detail: 'These recordings will be deleted. Make sure to save or export first.'
+    })
+    
+    if (response.response === 0) {
+      quitting = true
+      app.quit()
+    }
+  } else {
+    quitting = true
+    app.quit()
+  }
+})
+```
 
 ---
 
-## ✅ TASK F.2: Add Split Visual Indicator
+## Task Summary (UPDATED)
 
-**📁 Files to modify:**
-- `src/renderer/src/components/Timeline.tsx`
-- `src/renderer/src/assets/main.css`
-
-**Implementation:**
-- Detect if playhead is over a clip
-- Show gold vertical line at playhead position
-- Only show when over a clip
-- CSS: Gold line with shadow
-
-**🧪 CHECKPOINT F.2:**
-- Move playhead over clip
-- Should see gold split indicator line
-- Line shows where split will occur
-
----
-
-# 🟢 PHASE G: Multi-Clip Export
-
-## ✅ TASK G.1: Add FFmpeg Concat Export Handler
-
-**📁 Files to modify:**
-- `src/main/index.ts`
-- `src/preload/index.ts`
-- `src/preload/index.d.ts`
-
-**Implementation:**
-- IPC handler: `export-multi-clip`
-- Use FFmpeg complex filter:
-  - Trim each clip
-  - Concat all clips (video + audio)
-  - Map outputs
-- Send progress events
-
-**🧪 CHECKPOINT G.1:**
-- Test will be in next task
-
----
-
-## ✅ TASK G.2: Update Export Button for Multi-Clip
-
-**📁 Files to modify:**
-- `src/renderer/src/App.tsx` (VideoEditor function)
-- `src/renderer/src/components/ExportButton.tsx`
-
-**Implementation:**
-- Update `handleExport`:
-  - If 1 clip: use simple export
-  - If multiple clips: use `exportMultiClip`
-- Update `ExportButton` props: `hasClips` instead of `sourcePath`
-- Update button text: "Export Timeline"
-
-**🧪 CHECKPOINT G.2:**
-- Load 2-3 clips
-- Click Export
-- Should concatenate all clips
-- Output video plays all clips in sequence
-
----
-
-# 🟢 PHASE H: Polish & Temp File Management Integration
-
-## ✅ TASK H.1: Track Temp File References
-
-**📁 Files to modify:**
-- `src/renderer/src/App.tsx`
-- `src/main/index.ts`
-
-**Implementation:**
-- Helper: `getTempFileClips()` - find clips using temp files
-- Add `before-quit` handler in main process
-- Check for unsaved recordings
-- Show warning dialog if temp files exist
-- IPC: `check-unsaved-recordings` event
-
-**🧪 CHECKPOINT H.1:**
-- Record clip, keep in temp
-- Try to quit app
-- Should see warning dialog
-- "Quit Anyway" quits, "Cancel" stays open
-
----
-
-## ✅ TASK H.2: Add Visual Indicator for Temp Files
-
-**📁 Files to modify:**
-- `src/renderer/src/components/TimelineClip.tsx`
-- `src/renderer/src/assets/main.css`
-
-**Implementation:**
-- Detect if `sourcePath` contains 'clipforge-recordings'
-- Add ⚠️ icon to clip
-- Orange color for temp file clips
-- Tooltip: "Unsaved recording"
-
-**🧪 CHECKPOINT H.2:**
-- Record clip, cancel save
-- Clip should have orange color and ⚠️ icon
-- Hover shows tooltip
-
----
-
-## ✅ TASK H.3: Initialize Temp Dir on App Start
-
-**📁 Files to modify:**
-- `src/main/index.ts`
-
-**Implementation:**
-- Call `initializeOnAppStart([])` in `app.whenReady()`
-- Pass empty array for now (will pass timeline refs later)
-
-**🧪 CHECKPOINT H.3:**
-- Add old test files to `/tmp/clipforge-recordings/`
-- Start app
-- Old files (7+ days) should be deleted
-
----
-
-## ✅ TASK H.4: Remove Test Buttons & Clean Up UI
-
-**📁 Files to modify:**
-- `src/renderer/src/App.tsx`
-
-**Implementation:**
-- Remove temporary test buttons
-- Add proper recording controls to info panel:
-  - "🖥️ Record Screen" button
-  - "📹 Record Webcam" button
-- Add CSS for recording controls
-- Polish overall layout
-
-**🧪 CHECKPOINT H.4:**
-- Test buttons removed
-- Recording controls in info panel
-- UI looks intentional and polished
-
----
-
-# 🎯 FINAL COMPREHENSIVE TEST
-
-**Complete workflow test:**
-
-1. **Import & Recording:**
-   - [ ] Import video file → timeline
-   - [ ] Record webcam → timeline
-   - [ ] Record screen → timeline
-   - [ ] Verify 3 clips on timeline
-
-2. **Timeline:**
-   - [ ] Clips positioned sequentially
-   - [ ] Correct icons (📁 🖥️ 📹)
-   - [ ] Clicking selects clip
-   - [ ] Temp files show ⚠️
-
-3. **Trim:**
-   - [ ] Drag trim handles works
-   - [ ] Clip width updates
-   - [ ] Info panel shows duration
-
-4. **Playback:**
-   - [ ] Play → plays first clip
-   - [ ] Automatic transitions
-   - [ ] Plays through all clips
-   - [ ] Stops at end
-
-5. **Split:**
-   - [ ] Cmd+K splits clip
-   - [ ] Both pieces remain
-   - [ ] Both playable
-
-6. **Export:**
-   - [ ] Export dialog works
-   - [ ] Progress shows
-   - [ ] Output plays all clips
-   - [ ] Trim points respected
-
-7. **Temp Files:**
-   - [ ] Unsaved clips have ⚠️
-   - [ ] Quit warning appears
-   - [ ] Cleanup on restart
-
-8. **System Audio (macOS 13+):**
-   - [ ] Screen recording captures audio
-   - [ ] Playback includes system audio
-
----
-
-## Task Summary
-
-**Total Tasks:** 37 tasks across 8 phases
-**Estimated Time:** 25-30 hours
+**Total Tasks:** 40 tasks across 8 phases
+**Estimated Time:** 28-35 hours (added 3-5 hours for floating window)
 
 ### Phase Breakdown:
-- **Phase A:** Foundation (3 tasks, ~2 hours)
-- **Phase B:** Webcam Recording (4 tasks, ~3 hours)
-- **Phase C:** Screen Recording (7 tasks, ~5 hours)
-- **Phase D:** Multi-Clip State (4 tasks, ~4 hours)
+- **Phase A:** Foundation (2 tasks, ~2 hours)
+- **Phase B:** State Migration + Webcam (4 tasks, ~4 hours)
+- **Phase C:** Screen Recording + Floating Window (6 tasks, ~7 hours)
+- **Phase D:** Multi-Clip Timeline (4 tasks, ~4 hours)
 - **Phase E:** Multi-Clip Playback (2 tasks, ~2 hours)
 - **Phase F:** Split Functionality (2 tasks, ~2 hours)
-- **Phase G:** Multi-Clip Export (2 tasks, ~3 hours)
+- **Phase G:** Multi-Clip Export (2 tasks, ~2 hours)
 - **Phase H:** Polish & Cleanup (4 tasks, ~2 hours)
 
-### Checkpoints:
-- **37 individual task checkpoints**
-- **1 comprehensive final test**
+---
+
+## FINAL COMPREHENSIVE TEST
+
+(Same as original - checkpoints are correct)
 
 ---
 
-## Next Steps
-
-1. Begin with Phase A (Foundation)
-2. Complete each task in order
-3. Run checkpoint tests after each task
-4. Commit after completing each phase
-5. Run final comprehensive test before marking complete
-
----
-
-**Document Version:** 1.0  
-**Created:** October 29, 2025  
+**Document Version:** 2.0 (CORRECTED)
+**Created:** October 29, 2025
+**Last Updated:** October 29, 2025
 **Status:** Ready for implementation
-
