@@ -385,7 +385,7 @@ body {
 .recording-indicator {
   position: absolute;
   top: 20px;
-  left: 20px;
+  left: -180px; /* Move outside webcam view to the left */
   background: rgba(0, 0, 0, 0.8);
   padding: 8px 16px;
   border-radius: 20px;
@@ -399,17 +399,16 @@ body {
 .recording-dot {
   color: #ff3b30;
   font-size: 16px;
-  animation: blink 1s infinite;
+  animation: pulse 1.5s ease-in-out infinite;
 }
 
-@keyframes blink {
+@keyframes pulse {
   0%,
-  50% {
+  100% {
     opacity: 1;
   }
-  51%,
-  100% {
-    opacity: 0;
+  50% {
+    opacity: 0.4;
   }
 }
 
