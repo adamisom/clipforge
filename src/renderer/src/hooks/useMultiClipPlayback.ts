@@ -75,7 +75,7 @@ export const useMultiClipPlayback = (clips: TimelineClip[]): UseMultiClipPlaybac
 
   const handlePlayheadChange = useCallback((position: number) => {
     setPlayheadPosition(position)
-    setIsPlaying(false)
+    // Don't pause here - let the Timeline component handle pause/resume logic
   }, [])
 
   const play = useCallback(() => setIsPlaying(true), [])

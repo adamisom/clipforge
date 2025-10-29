@@ -105,7 +105,14 @@ function App(): React.JSX.Element {
           enableDragAndDrop={ENABLE_DRAG_AND_DROP}
         />
       ) : (
-        <VideoEditor clips={clips} setClips={setClips} selectedClipId={selectedClipId} />
+        <VideoEditor
+          clips={clips}
+          setClips={setClips}
+          selectedClipId={selectedClipId}
+          onImport={handleImport}
+          onRecordScreen={() => setShowScreenRecorder(true)}
+          onRecordWebcam={() => setShowWebcamRecorder(true)}
+        />
       )}
 
       {showWebcamRecorder && (

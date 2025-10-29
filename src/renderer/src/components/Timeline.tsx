@@ -10,6 +10,11 @@ interface TimelineProps {
   onClipSelect: (clipId: string) => void
   onTrimChange: (clipId: string, trimStart: number, trimEnd: number) => void
   onPlayheadChange: (position: number) => void
+  onPlayheadDragStart: () => void
+  onPlayheadDragEnd: () => void
+  onImport: () => void
+  onRecordScreen: () => void
+  onRecordWebcam: () => void
 }
 
 function Timeline({
@@ -18,7 +23,12 @@ function Timeline({
   playheadPosition,
   onClipSelect,
   onTrimChange,
-  onPlayheadChange
+  onPlayheadChange,
+  onPlayheadDragStart,
+  onPlayheadDragEnd,
+  onImport,
+  onRecordScreen,
+  onRecordWebcam
 }: TimelineProps): React.JSX.Element {
   const [isDraggingTrim, setIsDraggingTrim] = useState(false)
   const [isDraggingPlayhead, setIsDraggingPlayhead] = useState(false)
@@ -62,6 +72,7 @@ function Timeline({
   const handlePlayheadDragStart = (e: React.MouseEvent): void => {
     e.stopPropagation()
     setIsDraggingPlayhead(true)
+    onPlayheadDragStart() // Notify parent that drag started
   }
 
   // Handle clip click to select
@@ -131,6 +142,7 @@ function Timeline({
 
     const handleMouseUp = (): void => {
       setIsDraggingPlayhead(false)
+      onPlayheadDragEnd() // Notify parent that drag ended
     }
 
     window.addEventListener('mousemove', handleMouseMove)
@@ -144,84 +156,112 @@ function Timeline({
 
   return (
     <div className="timeline-panel">
-      <div ref={timelineRef} className="timeline-container" style={{ width: `${timelineWidth}px` }}>
-        {/* Time Ruler */}
-        <div className="time-ruler">
-          {timeMarkers.map((time) => (
-            <div
-              key={time}
-              style={{
-                position: 'absolute',
-                left: `${time * pixelsPerSecond}px`,
-                top: '50%',
-                transform: 'translateY(-50%)',
-                fontSize: '12px',
-                color: '#888',
-                userSelect: 'none'
-              }}
-            >
-              {formatTime(time)}
-            </div>
-          ))}
-        </div>
+      {/* Timeline Toolbar */}
+      <div className="timeline-toolbar">
+        <button onClick={onImport} className="timeline-toolbar-button" title="Import Video (Cmd+I)">
+          + Import
+        </button>
+        <button
+          onClick={onRecordScreen}
+          className="timeline-toolbar-button"
+          title="Record Screen (Cmd+Shift+R)"
+        >
+          🖥️
+        </button>
+        <button
+          onClick={onRecordWebcam}
+          className="timeline-toolbar-button"
+          title="Record Webcam (Cmd+Shift+W)"
+        >
+          📹
+        </button>
+      </div>
 
-        {/* Timeline Track */}
-        <div className="timeline-track">
-          {/* Render all clips */}
-          {clips.map((clip) => {
-            const clipPositionData = clipPositions.get(clip.id)
-            const clipStart = clipPositionData?.start || 0
-            const isSelected = clip.id === selectedClipId
-            const isTemp = isTempFile(clip.sourcePath)
-
-            return (
+      {/* Timeline Content Wrapper */}
+      <div className="timeline-content-wrapper">
+        <div
+          ref={timelineRef}
+          className="timeline-container"
+          style={{ width: `${timelineWidth}px` }}
+        >
+          {/* Time Ruler */}
+          <div className="time-ruler">
+            {timeMarkers.map((time) => (
               <div
-                key={clip.id}
-                className={`timeline-clip ${isSelected ? 'selected' : ''} ${isTemp ? 'temp-file' : ''}`}
+                key={time}
                 style={{
-                  transform: `translateX(${clipStart * pixelsPerSecond}px)`,
-                  width: `${clip.timelineDuration * pixelsPerSecond}px`,
-                  top: '15px'
+                  position: 'absolute',
+                  left: `${time * pixelsPerSecond}px`,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  fontSize: '12px',
+                  color: '#888',
+                  userSelect: 'none'
                 }}
-                onClick={() => handleClipClick(clip.id)}
               >
-                {isTemp && (
-                  <span className="temp-indicator" title="Unsaved recording">
-                    ⚠️
-                  </span>
-                )}
-                <span
-                  style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                  title={clip.metadata.filename}
-                >
-                  {clip.metadata.filename}
-                </span>
-
-                {/* Only show trim handles on selected clip */}
-                {isSelected && (
-                  <>
-                    <div
-                      className="trim-handle trim-handle-left"
-                      onMouseDown={(e) => handleTrimDragStart(e, clip.id, 'start')}
-                    />
-                    <div
-                      className="trim-handle trim-handle-right"
-                      onMouseDown={(e) => handleTrimDragStart(e, clip.id, 'end')}
-                    />
-                  </>
-                )}
+                {formatTime(time)}
               </div>
-            )
-          })}
+            ))}
+          </div>
 
-          {/* Playhead */}
-          <div
-            className="playhead"
-            style={{
-              transform: `translateX(${playheadPosition * pixelsPerSecond}px)`
-            }}
-            onMouseDown={handlePlayheadDragStart}
-          />
+          {/* Timeline Track */}
+          <div className="timeline-track">
+            {/* Render all clips */}
+            {clips.map((clip) => {
+              const clipPositionData = clipPositions.get(clip.id)
+              const clipStart = clipPositionData?.start || 0
+              const isSelected = clip.id === selectedClipId
+              const isTemp = isTempFile(clip.sourcePath)
+
+              return (
+                <div
+                  key={clip.id}
+                  className={`timeline-clip ${isSelected ? 'selected' : ''} ${isTemp ? 'temp-file' : ''}`}
+                  style={{
+                    transform: `translateX(${clipStart * pixelsPerSecond}px)`,
+                    width: `${clip.timelineDuration * pixelsPerSecond}px`,
+                    top: '15px'
+                  }}
+                  onClick={() => handleClipClick(clip.id)}
+                >
+                  {isTemp && (
+                    <span className="temp-indicator" title="Unsaved recording">
+                      ⚠️
+                    </span>
+                  )}
+                  <span
+                    style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                    title={clip.metadata.filename}
+                  >
+                    {clip.metadata.filename}
+                  </span>
+
+                  {/* Only show trim handles on selected clip */}
+                  {isSelected && (
+                    <>
+                      <div
+                        className="trim-handle trim-handle-left"
+                        onMouseDown={(e) => handleTrimDragStart(e, clip.id, 'start')}
+                      />
+                      <div
+                        className="trim-handle trim-handle-right"
+                        onMouseDown={(e) => handleTrimDragStart(e, clip.id, 'end')}
+                      />
+                    </>
+                  )}
+                </div>
+              )
+            })}
+
+            {/* Playhead */}
+            <div
+              className="playhead"
+              style={{
+                transform: `translateX(${playheadPosition * pixelsPerSecond}px)`
+              }}
+              onMouseDown={handlePlayheadDragStart}
+            />
+          </div>
         </div>
       </div>
     </div>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { TimelineClip } from '../types/timeline'
 import Timeline from './Timeline'
 import VideoPreview from './VideoPreview'
@@ -10,9 +10,19 @@ interface VideoEditorProps {
   clips: TimelineClip[]
   setClips: React.Dispatch<React.SetStateAction<TimelineClip[]>>
   selectedClipId: string | null
+  onImport: () => void
+  onRecordScreen: () => void
+  onRecordWebcam: () => void
 }
 
-function VideoEditor({ clips, setClips, selectedClipId }: VideoEditorProps): React.JSX.Element {
+function VideoEditor({
+  clips,
+  setClips,
+  selectedClipId,
+  onImport,
+  onRecordScreen,
+  onRecordWebcam
+}: VideoEditorProps): React.JSX.Element {
   const {
     playheadPosition,
     isPlaying,
@@ -20,8 +30,25 @@ function VideoEditor({ clips, setClips, selectedClipId }: VideoEditorProps): Rea
     relativePlayheadPosition,
     handleTimeUpdate,
     handlePlayheadChange,
-    togglePlayPause
+    togglePlayPause,
+    play,
+    pause
   } = useMultiClipPlayback(clips)
+
+  const [wasPlayingBeforeDrag, setWasPlayingBeforeDrag] = useState(false)
+
+  const handlePlayheadDragStart = useCallback(() => {
+    setWasPlayingBeforeDrag(isPlaying)
+    if (isPlaying) {
+      pause()
+    }
+  }, [isPlaying, pause])
+
+  const handlePlayheadDragEnd = useCallback(() => {
+    if (wasPlayingBeforeDrag) {
+      play()
+    }
+  }, [wasPlayingBeforeDrag, play])
 
   const handleClipSelect = useCallback(() => {
     // Clicking a clip doesn't change playhead, just for future features
@@ -167,6 +194,11 @@ function VideoEditor({ clips, setClips, selectedClipId }: VideoEditorProps): Rea
         onClipSelect={handleClipSelect}
         onTrimChange={handleTrimChange}
         onPlayheadChange={handlePlayheadChange}
+        onPlayheadDragStart={handlePlayheadDragStart}
+        onPlayheadDragEnd={handlePlayheadDragEnd}
+        onImport={onImport}
+        onRecordScreen={onRecordScreen}
+        onRecordWebcam={onRecordWebcam}
       />
 
       <InfoPanel currentClip={currentClip} totalClips={clips.length} onExport={handleExport} />
