@@ -12,11 +12,10 @@ files:
 asarUnpack:
   - resources/**
 extraResources:
-  - from: node_modules/@ffmpeg-installer/darwin-arm64/
-    to: .
-    filter:
-      - ffmpeg
-      - ffprobe
+  - from: node_modules/@ffmpeg-installer/darwin-arm64/ffmpeg
+    to: ffmpeg
+  - from: node_modules/@ffprobe-installer/darwin-arm64/ffprobe
+    to: ffprobe
 win:
   executableName: clipforge
 nsis:

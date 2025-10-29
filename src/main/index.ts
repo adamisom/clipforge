@@ -4,13 +4,12 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import ffmpeg from 'fluent-ffmpeg'
 import ffmpegInstaller from '@ffmpeg-installer/ffmpeg'
+import ffprobeInstaller from '@ffprobe-installer/ffprobe'
 import fs from 'fs'
 
-// Set up FFmpeg binary path (dev vs production)
+// Set up FFmpeg and FFprobe binary paths (dev vs production)
 const ffmpegPath = app.isPackaged ? join(process.resourcesPath, 'ffmpeg') : ffmpegInstaller.path
-const ffprobePath = app.isPackaged
-  ? join(process.resourcesPath, 'ffprobe')
-  : ffmpegInstaller.path.replace('ffmpeg', 'ffprobe')
+const ffprobePath = app.isPackaged ? join(process.resourcesPath, 'ffprobe') : ffprobeInstaller.path
 
 if (!fs.existsSync(ffmpegPath)) {
   console.error('FFmpeg not found at:', ffmpegPath)
