@@ -45,6 +45,7 @@ if (!fs.existsSync(ffprobePath)) {
 // Track recording state
 let isRecording = false
 let recordingNotification: Notification | null = null
+let quitting = false
 
 function createWindow(): void {
   // Create the browser window.
@@ -92,6 +93,51 @@ function createWindow(): void {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
 }
+
+// App quit handler - warn about unsaved recordings
+app.on('before-quit', async (e) => {
+  if (quitting) return
+
+  e.preventDefault()
+
+  const mainWindow = BrowserWindow.getAllWindows().find((w) => !w.isAlwaysOnTop())
+  if (!mainWindow) {
+    quitting = true
+    app.quit()
+    return
+  }
+
+  // Check for temp files with timeout
+  const timeoutPromise = new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 2000))
+
+  const checkPromise = new Promise<boolean>((resolve) => {
+    mainWindow.webContents.send('check-unsaved-recordings')
+    ipcMain.once('unsaved-recordings-response', (_event, { hasTempFiles }) => {
+      resolve(hasTempFiles)
+    })
+  })
+
+  const hasTempFiles = await Promise.race([checkPromise, timeoutPromise])
+
+  if (hasTempFiles) {
+    const response = await dialog.showMessageBox(mainWindow, {
+      type: 'warning',
+      buttons: ['Quit Anyway', 'Cancel'],
+      defaultId: 1,
+      title: 'Unsaved Recordings',
+      message: 'You have unsaved recordings in temporary storage.',
+      detail: 'These recordings will be deleted. Make sure to save or export first.'
+    })
+
+    if (response.response === 0) {
+      quitting = true
+      app.quit()
+    }
+  } else {
+    quitting = true
+    app.quit()
+  }
+})
 
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.

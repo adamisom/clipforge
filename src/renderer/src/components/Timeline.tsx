@@ -190,11 +190,12 @@ function Timeline({
           {clips.map((clip) => {
             const clipStart = clipPositions.get(clip.id) || 0
             const isSelected = clip.id === selectedClipId
+            const isTempFile = clip.sourcePath.includes('/clipforge-recording-')
 
             return (
               <div
                 key={clip.id}
-                className={`timeline-clip ${isSelected ? 'selected' : ''}`}
+                className={`timeline-clip ${isSelected ? 'selected' : ''} ${isTempFile ? 'temp-file' : ''}`}
                 style={{
                   transform: `translateX(${clipStart * pixelsPerSecond}px)`,
                   width: `${clip.timelineDuration * pixelsPerSecond}px`,
@@ -202,6 +203,11 @@ function Timeline({
                 }}
                 onClick={() => handleClipClick(clip.id)}
               >
+                {isTempFile && (
+                  <span className="temp-indicator" title="Unsaved recording">
+                    ⚠️
+                  </span>
+                )}
                 <span
                   style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
                   title={clip.metadata.filename}

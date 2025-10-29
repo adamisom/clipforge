@@ -8,7 +8,7 @@ import ScreenRecorder from './components/ScreenRecorder'
 import { TimelineClip } from './types/timeline'
 
 // Feature flags
-const ENABLE_DRAG_AND_DROP = false
+const ENABLE_DRAG_AND_DROP = true
 
 // Helper to generate unique clip IDs
 const generateClipId = (): string => {
@@ -490,6 +490,20 @@ function App(): React.JSX.Element {
       window.api.removeAllListeners('menu-import')
     }
   }, [handleImport])
+
+  // Listen for quit check - respond with whether we have temp files
+  useEffect(() => {
+    const handleCheckUnsavedRecordings = (): void => {
+      const hasTempFiles = clips.some((clip) => clip.sourcePath.includes('/clipforge-recording-'))
+      window.api.respondUnsavedRecordings(hasTempFiles)
+    }
+
+    window.api.onCheckUnsavedRecordings(handleCheckUnsavedRecordings)
+
+    return () => {
+      window.api.removeAllListeners('check-unsaved-recordings')
+    }
+  }, [clips])
 
   return (
     <div

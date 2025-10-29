@@ -34,6 +34,10 @@ const api = {
     ipcRenderer.on('menu-import', callback),
   onMenuExport: (callback: (event: IpcRendererEvent) => void) =>
     ipcRenderer.on('menu-export', callback),
+  onCheckUnsavedRecordings: (callback: () => void) =>
+    ipcRenderer.on('check-unsaved-recordings', callback),
+  respondUnsavedRecordings: (hasTempFiles: boolean) =>
+    ipcRenderer.send('unsaved-recordings-response', { hasTempFiles }),
   removeAllListeners: (channel: string) => ipcRenderer.removeAllListeners(channel)
 }
 

@@ -49,6 +49,8 @@ declare global {
       ) => void
       onMenuImport: (callback: (event: IpcRendererEvent) => void) => void
       onMenuExport: (callback: (event: IpcRendererEvent) => void) => void
+      onCheckUnsavedRecordings: (callback: () => void) => void
+      respondUnsavedRecordings: (hasTempFiles: boolean) => void
       removeAllListeners: (channel: string) => void
     }
   }
