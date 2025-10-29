@@ -12,6 +12,7 @@ function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): 
   )
   const [countdown, setCountdown] = useState<number | null>(null)
   const [recordingTime, setRecordingTime] = useState(0)
+  const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null)
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
@@ -20,10 +21,37 @@ function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): 
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const recordingStartTimeRef = useRef<number>(0)
 
-  const handleSourceSelect = async (sourceId: string): Promise<void> => {
+  const handleSourceSelect = (sourceId: string): void => {
+    // Just store the source ID, don't get the stream yet
+    setSelectedSourceId(sourceId)
+    setStage('ready-to-record')
+  }
+
+  const handleStartRecording = (): void => {
+    // Start countdown FIRST (user sees 3-2-1)
+    setStage('countdown')
+    setCountdown(3)
+
+    const countdownInterval = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev === null || prev <= 1) {
+          clearInterval(countdownInterval)
+          // AFTER countdown completes, get stream and start recording
+          if (selectedSourceId) {
+            getStreamAndBeginRecording(selectedSourceId)
+          }
+          return null
+        }
+        return prev - 1
+      })
+    }, 1000)
+  }
+
+  const getStreamAndBeginRecording = async (sourceId: string): Promise<void> => {
     try {
+      // NOW get the screen stream (capturing starts here)
       const constraints = {
-        audio: false, // Disable audio for now
+        audio: false,
         video: {
           mandatory: {
             chromeMediaSource: 'desktop',
@@ -43,8 +71,8 @@ function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): 
 
       streamRef.current = mediaStream
 
-      // Show ready dialog before starting
-      setStage('ready-to-record')
+      // Minimize and start recording immediately
+      minimizeAndBeginRecording(mediaStream)
     } catch (err) {
       console.error('Screen recording error:', err)
       alert(
@@ -54,33 +82,16 @@ function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): 
     }
   }
 
-  const handleStartRecording = async (): Promise<void> => {
+  const minimizeAndBeginRecording = async (mediaStream: MediaStream): Promise<void> => {
     try {
-      // Close the ready dialog and minimize window FIRST
-      onClose()
-
       // Minimize window, show notification, register shortcut
       await window.api.startRecording()
 
-      // Small delay to ensure window is minimized
-      await new Promise((resolve) => setTimeout(resolve, 300))
+      // Wait longer for macOS minimize animation to complete (typically ~500ms)
+      await new Promise((resolve) => setTimeout(resolve, 800))
 
-      // Now do countdown (won't be visible in recording since window is minimized)
-      setStage('countdown')
-      setCountdown(3)
-
-      const countdownInterval = setInterval(() => {
-        setCountdown((prev) => {
-          if (prev === null || prev <= 1) {
-            clearInterval(countdownInterval)
-            if (streamRef.current) {
-              beginRecording(streamRef.current)
-            }
-            return null
-          }
-          return prev - 1
-        })
-      }, 1000)
+      // Now actually start recording (window should be fully minimized)
+      beginRecording(mediaStream)
     } catch (err) {
       console.error('Failed to start recording:', err)
       alert('Failed to start recording: ' + (err instanceof Error ? err.message : String(err)))

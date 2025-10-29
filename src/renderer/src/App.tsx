@@ -38,6 +38,7 @@ function WelcomeScreen({
 function VideoEditor({
   clips,
   setClips,
+  selectedClipId,
   playheadPosition,
   setPlayheadPosition,
   isPlaying,
@@ -45,13 +46,16 @@ function VideoEditor({
 }: {
   clips: TimelineClip[]
   setClips: React.Dispatch<React.SetStateAction<TimelineClip[]>>
+  selectedClipId: string | null
   playheadPosition: number
   setPlayheadPosition: (pos: number) => void
   isPlaying: boolean
   setIsPlaying: (playing: boolean) => void
 }): React.JSX.Element {
-  // For now, just show first clip
-  const currentClip = clips[0]
+  // Show the selected clip, or first clip as fallback
+  const currentClip = selectedClipId
+    ? clips.find((c) => c.id === selectedClipId) || clips[0]
+    : clips[0]
   const totalDuration = clips.reduce((sum, c) => sum + c.timelineDuration, 0)
 
   const handlePlayPause = (): void => {
@@ -171,6 +175,7 @@ function VideoEditor({
 function App(): React.JSX.Element {
   // NEW multi-clip state
   const [clips, setClips] = useState<TimelineClip[]>([])
+  const [selectedClipId, setSelectedClipId] = useState<string | null>(null)
   const [playheadPosition, setPlayheadPosition] = useState(0)
   const [isPlaying, setIsPlaying] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
@@ -214,7 +219,9 @@ function App(): React.JSX.Element {
         }
       }
 
+      // Add to clips array and select it for preview
       setClips((prev) => [...prev, newClip])
+      setSelectedClipId(newClip.id)
     } catch (error) {
       console.error('Failed to save recording:', error)
       alert(`Failed to save recording: ${error}`)
@@ -258,7 +265,9 @@ function App(): React.JSX.Element {
         }
       }
 
+      // Add to clips array and select it for preview
       setClips((prev) => [...prev, newClip])
+      setSelectedClipId(newClip.id)
     } catch (error) {
       console.error('Failed to save screen recording:', error)
       alert(`Failed to save recording: ${error}`)
@@ -288,7 +297,9 @@ function App(): React.JSX.Element {
         }
       }
 
+      // Add to clips array and select it for preview
       setClips((prev) => [...prev, newClip])
+      setSelectedClipId(newClip.id)
     } catch (error) {
       console.error('Import failed:', error)
       alert(`Failed to import video: ${error}`)
@@ -374,6 +385,7 @@ function App(): React.JSX.Element {
         <VideoEditor
           clips={clips}
           setClips={setClips}
+          selectedClipId={selectedClipId}
           playheadPosition={playheadPosition}
           setPlayheadPosition={setPlayheadPosition}
           isPlaying={isPlaying}
