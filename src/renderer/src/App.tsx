@@ -2,6 +2,7 @@ import { useState } from 'react'
 import './assets/main.css'
 import Timeline from './components/Timeline'
 import VideoPreview from './components/VideoPreview'
+import ExportButton from './components/ExportButton'
 
 // Type definitions
 interface VideoState {
@@ -59,6 +60,28 @@ function VideoEditor({
     setVideoState((prev) => ({ ...prev, playheadPosition: position, isPlaying: false }))
   }
 
+  const handleExport = async (): Promise<void> => {
+    try {
+      // Get output path from user
+      const outputPath = await window.api.selectSavePath()
+      if (!outputPath) return
+
+      // Calculate trim duration
+      const duration = videoState.trimEnd - videoState.trimStart
+
+      // Start export
+      await window.api.exportVideo(
+        videoState.sourcePath!,
+        outputPath,
+        videoState.trimStart,
+        duration
+      )
+    } catch (error) {
+      console.error('Export failed:', error)
+      alert(`Export failed: ${error}`)
+    }
+  }
+
   return (
     <div className="video-editor">
       <div className="preview-panel">
@@ -97,6 +120,12 @@ function VideoEditor({
             {Math.floor(videoState.trimEnd)}s
           </div>
         </div>
+        <ExportButton
+          sourcePath={videoState.sourcePath}
+          trimStart={videoState.trimStart}
+          trimEnd={videoState.trimEnd}
+          onExport={handleExport}
+        />
       </div>
     </div>
   )
