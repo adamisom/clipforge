@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { formatTime } from '../utils/videoUtils'
+import { calculateClipPositions, isTempFile } from '../utils/clipUtils'
 
 interface TimelineClip {
   id: string
@@ -41,15 +42,7 @@ function Timeline({
   // Calculate total duration and clip positions
   const totalDuration = clips.reduce((sum, clip) => sum + clip.timelineDuration, 0)
 
-  const clipPositions = useMemo(() => {
-    const positions = new Map<string, number>()
-    let pos = 0
-    for (const clip of clips) {
-      positions.set(clip.id, pos)
-      pos += clip.timelineDuration
-    }
-    return positions
-  }, [clips])
+  const clipPositions = useMemo(() => calculateClipPositions(clips), [clips])
 
   // Calculate pixels per second dynamically based on total duration
   const maxTimelineWidth = 1500
@@ -102,7 +95,8 @@ function Timeline({
       const absoluteTime = x / pixelsPerSecond
 
       // Get clip's timeline position
-      const clipStart = clipPositions.get(dragClipId) || 0
+      const clipPositionData = clipPositions.get(dragClipId)
+      const clipStart = clipPositionData?.start || 0
       const relativeTime = absoluteTime - clipStart
 
       if (dragType === 'start') {
@@ -188,14 +182,15 @@ function Timeline({
         <div className="timeline-track">
           {/* Render all clips */}
           {clips.map((clip) => {
-            const clipStart = clipPositions.get(clip.id) || 0
+            const clipPositionData = clipPositions.get(clip.id)
+            const clipStart = clipPositionData?.start || 0
             const isSelected = clip.id === selectedClipId
-            const isTempFile = clip.sourcePath.includes('/clipforge-recording-')
+            const isTemp = isTempFile(clip.sourcePath)
 
             return (
               <div
                 key={clip.id}
-                className={`timeline-clip ${isSelected ? 'selected' : ''} ${isTempFile ? 'temp-file' : ''}`}
+                className={`timeline-clip ${isSelected ? 'selected' : ''} ${isTemp ? 'temp-file' : ''}`}
                 style={{
                   transform: `translateX(${clipStart * pixelsPerSecond}px)`,
                   width: `${clip.timelineDuration * pixelsPerSecond}px`,
@@ -203,7 +198,7 @@ function Timeline({
                 }}
                 onClick={() => handleClipClick(clip.id)}
               >
-                {isTempFile && (
+                {isTemp && (
                   <span className="temp-indicator" title="Unsaved recording">
                     ⚠️
                   </span>
