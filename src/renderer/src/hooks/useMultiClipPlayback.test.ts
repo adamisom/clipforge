@@ -325,10 +325,9 @@ describe('useMultiClipPlayback', () => {
     })
 
     it('recalculates when clips change', () => {
-      const { result, rerender } = renderHook(
-        ({ clips }) => useMultiClipPlayback(clips),
-        { initialProps: { clips: mockClips } }
-      )
+      const { result, rerender } = renderHook(({ clips }) => useMultiClipPlayback(clips), {
+        initialProps: { clips: mockClips }
+      })
 
       expect(result.current.totalDuration).toBe(18)
 
@@ -414,4 +413,3 @@ describe('useMultiClipPlayback', () => {
     })
   })
 })
-
