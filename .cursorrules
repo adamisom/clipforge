@@ -4,6 +4,7 @@
 
 ### Commit Workflow
 
+- **NEVER commit during troubleshooting/debugging mode** - only commit during lightning-speed implementation mode
 - Commit during substantial PR implementation work, before user review
 - Do NOT commit during user's PR review/approval phase unless they ask me to
 - **Before each commit:** ALWAYS run `npm run validate` (lint + typecheck + build)
@@ -28,7 +29,11 @@
 
 ### App Restarts
 
-After making code changes, inform the user if they need to restart the app, and if they need to do anything else (for example a clean npm install).
+- **ALWAYS inform the user if they need to restart the dev server** after making code changes (especially for main process, preload, or new files)
+- Assume user is running the app from dev server unless stated otherwise
+- Also inform if they need to do anything else (for example a clean npm install)
+- Hot reload works for renderer changes, but main/preload require restart
+- **NEVER run `npm run dev` yourself** - only the user should start the dev server (AI gets EPERM errors)
 
 <!-- **Restart REQUIRED for:**
 
