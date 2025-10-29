@@ -419,7 +419,30 @@ function VideoEditor({
   const currentClip = clips[0]
   const totalDuration = clips.reduce((sum, c) => sum + c.timelineDuration, 0)
   
-  // ... existing VideoEditor code, but use currentClip instead of videoState
+  const handleTrimChange = (newTrimStart: number, newTrimEnd: number): void => {
+    setClips(prevClips => prevClips.map((clip, index) => 
+      index === 0 ? {
+        ...clip,
+        sourceStartTime: newTrimStart,
+        timelineDuration: newTrimEnd - newTrimStart
+      } : clip
+    ))
+  }
+  
+  const handleExport = async (): Promise<void> => {
+    if (clips.length === 0) return
+    
+    const outputPath = await window.api.selectSavePath()
+    if (!outputPath) return
+    
+    // For now, export first clip only
+    await window.api.exportVideo(
+      currentClip.sourcePath,
+      outputPath,
+      currentClip.sourceStartTime,
+      currentClip.timelineDuration
+    )
+  }
   
   return (
     <div className="video-editor">
@@ -437,14 +460,86 @@ function VideoEditor({
         ) : null}
       </div>
       
-      {/* Keep existing Timeline and info panel */}
-      
-      <ExportButton
-        hasClips={clips.length > 0}
-        onExport={() => {/* will implement later */}}
+      {/* Temporarily pass first clip data to Timeline */}
+      <Timeline
+        duration={totalDuration}
+        trimStart={currentClip ? currentClip.sourceStartTime : 0}
+        trimEnd={currentClip ? currentClip.sourceStartTime + currentClip.timelineDuration : 0}
+        playheadPosition={playheadPosition}
+        onTrimChange={handleTrimChange}
+        onPlayheadChange={setPlayheadPosition}
       />
+      
+      <div className="info-panel">
+        <div className="info-content">
+          <h3>Video Info</h3>
+          <div className="info-item">
+            <strong>Clips:</strong> {clips.length}
+          </div>
+          {currentClip && (
+            <>
+              <div className="info-item">
+                <strong>File:</strong> {currentClip.metadata.filename}
+              </div>
+              <div className="info-item">
+                <strong>Resolution:</strong> {currentClip.metadata.resolution}
+              </div>
+            </>
+          )}
+        </div>
+        
+        <ExportButton
+          hasClips={clips.length > 0}
+          onExport={handleExport}
+        />
+      </div>
     </div>
   )
+}
+```
+
+**Update drag-and-drop handler in App.tsx:**
+```typescript
+const handleDrop = async (e: React.DragEvent): Promise<void> => {
+  e.preventDefault()
+  setIsDragging(false)
+
+  const files = Array.from(e.dataTransfer.files)
+  const videoFiles = files.filter((file) => {
+    const ext = file.name.toLowerCase().split('.').pop()
+    return ['mp4', 'mov'].includes(ext || '')
+  })
+
+  if (videoFiles.length === 0) {
+    alert('Please drop a video file (MP4 or MOV)')
+    return
+  }
+
+  const filePath = (videoFiles[0] as File & { path: string }).path
+  if (!filePath) return
+
+  try {
+    const metadata = await window.api.getVideoMetadata(filePath)
+    
+    const newClip: TimelineClip = {
+      id: generateClipId(),
+      sourceType: 'imported',
+      sourcePath: filePath,
+      sourceStartTime: 0,
+      sourceDuration: metadata.duration,
+      timelineDuration: metadata.duration,
+      metadata: {
+        filename: metadata.filename,
+        resolution: \`\${metadata.width}x\${metadata.height}\`,
+        codec: metadata.codec
+      }
+    }
+
+    setClips(prev => [...prev, newClip])
+  } catch (error) {
+    console.error('Drag-and-drop import failed:', error)
+    alert(\`Failed to import video: \${error}\`)
+  }
 }
 ```
 
@@ -461,13 +556,194 @@ function VideoEditor({
 **📁 Files to create:**
 - `src/renderer/src/components/WebcamRecorder.tsx`
 
-**Full implementation:** (See original plan for full code - it's correct)
+**Full implementation:**
 
-Key points:
-- Use `navigator.mediaDevices.getUserMedia({ video: true, audio: true })`
-- 3-2-1 countdown with state management
-- `MediaRecorder` with `ondataavailable` and `onstop`
-- Return blob via `onRecordingComplete` callback
+```typescript
+import { useState, useRef, useEffect } from 'react'
+
+interface WebcamRecorderProps {
+  onRecordingComplete: (blob: Blob) => void
+  onClose: () => void
+}
+
+function WebcamRecorder({ onRecordingComplete, onClose }: WebcamRecorderProps) {
+  const [stage, setStage] = useState<'preview' | 'countdown' | 'recording'>('preview')
+  const [countdown, setCountdown] = useState<number | null>(null)
+  const [recordingTime, setRecordingTime] = useState(0)
+  const [error, setError] = useState<string | null>(null)
+  
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const chunksRef = useRef<Blob[]>([])
+  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Initialize webcam on mount
+  useEffect(() => {
+    const initWebcam = async (): Promise<void> => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: true, 
+          audio: true 
+        })
+        
+        streamRef.current = stream
+        
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream
+        }
+      } catch (err) {
+        console.error('Webcam access error:', err)
+        setError('Could not access webcam. Please check permissions.')
+      }
+    }
+
+    initWebcam()
+
+    // Cleanup on unmount
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop())
+      }
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current)
+      }
+    }
+  }, [])
+
+  const startCountdown = (): void => {
+    setStage('countdown')
+    setCountdown(3)
+    
+    const countdownInterval = setInterval(() => {
+      setCountdown(prev => {
+        if (prev === null || prev <= 1) {
+          clearInterval(countdownInterval)
+          beginRecording()
+          return null
+        }
+        return prev - 1
+      })
+    }, 1000)
+  }
+
+  const beginRecording = (): void => {
+    if (!streamRef.current) {
+      setError('Stream not available')
+      return
+    }
+
+    try {
+      const mediaRecorder = new MediaRecorder(streamRef.current, {
+        mimeType: 'video/webm;codecs=vp9'
+      })
+      
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          chunksRef.current.push(event.data)
+        }
+      }
+      
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: 'video/webm' })
+        onRecordingComplete(blob)
+      }
+      
+      mediaRecorder.start(1000) // Collect data every second
+      mediaRecorderRef.current = mediaRecorder
+      setStage('recording')
+      
+      // Start recording timer
+      timerIntervalRef.current = setInterval(() => {
+        setRecordingTime(prev => prev + 1)
+      }, 1000)
+    } catch (err) {
+      console.error('Recording start error:', err)
+      setError('Failed to start recording')
+    }
+  }
+
+  const stopRecording = (): void => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop()
+    }
+    
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop())
+    }
+    
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current)
+    }
+  }
+
+  const formatTime = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return \`\${mins}:\${secs.toString().padStart(2, '0')}\`
+  }
+
+  if (error) {
+    return (
+      <div className="webcam-recorder-overlay">
+        <div className="webcam-recorder-modal">
+          <div className="error-message">
+            <p>{error}</p>
+            <button onClick={onClose}>Close</button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="webcam-recorder-overlay">
+      <div className="webcam-recorder-modal">
+        <video
+          ref={videoRef}
+          autoPlay
+          muted
+          className="webcam-preview"
+        />
+        
+        {stage === 'countdown' && countdown !== null && (
+          <div className="countdown-overlay">
+            <div className="countdown-number">{countdown}</div>
+          </div>
+        )}
+        
+        {stage === 'recording' && (
+          <div className="recording-indicator">
+            <span className="recording-dot">●</span>
+            <span>{formatTime(recordingTime)}</span>
+          </div>
+        )}
+        
+        <div className="webcam-controls">
+          {stage === 'preview' && (
+            <>
+              <button onClick={startCountdown} className="start-button">
+                Start Recording
+              </button>
+              <button onClick={onClose} className="cancel-button">
+                Cancel
+              </button>
+            </>
+          )}
+          
+          {stage === 'recording' && (
+            <button onClick={stopRecording} className="stop-button">
+              Stop Recording
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default WebcamRecorder
+```
 
 **🧪 CHECKPOINT B.1:**
 - Create temp test to render component
@@ -479,7 +755,138 @@ Key points:
 
 ## ✅ TASK B.2: Add Webcam Recording Styles
 
-(See original - styles are correct)
+**📁 Files to modify:**
+- `src/renderer/src/assets/main.css`
+
+**Add CSS:**
+
+```css
+/* Webcam Recorder */
+.webcam-recorder-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.webcam-recorder-modal {
+  position: relative;
+  width: 640px;
+  max-width: 90vw;
+}
+
+.webcam-preview {
+  width: 100%;
+  border-radius: 12px;
+  background: #000;
+}
+
+.countdown-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.7);
+  border-radius: 12px;
+}
+
+.countdown-number {
+  font-size: 120px;
+  font-weight: bold;
+  color: #ffffff;
+  animation: countdown-pulse 1s ease-in-out;
+}
+
+@keyframes countdown-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.2); opacity: 0.8; }
+}
+
+.recording-indicator {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  background: rgba(0, 0, 0, 0.8);
+  padding: 8px 16px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: white;
+  font-weight: 500;
+}
+
+.recording-dot {
+  color: #ff3b30;
+  font-size: 16px;
+  animation: blink 1s infinite;
+}
+
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+.webcam-controls {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+.webcam-controls button {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.start-button {
+  background: #646cff;
+  color: white;
+}
+
+.start-button:hover {
+  background: #535bf2;
+}
+
+.stop-button {
+  background: #ff3b30;
+  color: white;
+}
+
+.stop-button:hover {
+  background: #e02d20;
+}
+
+.cancel-button {
+  background: #444;
+  color: white;
+}
+
+.cancel-button:hover {
+  background: #555;
+}
+
+.error-message {
+  color: white;
+  text-align: center;
+  padding: 40px;
+}
+```
 
 ---
 
@@ -561,13 +968,234 @@ Add test button:
 
 ## ✅ TASK C.1: Add IPC Handler for Screen Sources
 
-(See original - code is correct)
+**📁 Files to modify:**
+- `src/main/index.ts`
+- `src/preload/index.ts`
+- `src/preload/index.d.ts`
+
+**Add to `src/main/index.ts`:**
+
+```typescript
+import { desktopCapturer } from 'electron'
+
+// Add IPC handler
+ipcMain.handle('get-screen-sources', async () => {
+  const sources = await desktopCapturer.getSources({
+    types: ['screen', 'window'],
+    thumbnailSize: { width: 300, height: 200 }
+  })
+  
+  return sources.map(source => ({
+    id: source.id,
+    name: source.name,
+    thumbnail: source.thumbnail.toDataURL()
+  }))
+})
+```
+
+**Add to `src/preload/index.ts`:**
+```typescript
+  getScreenSources: () => ipcRenderer.invoke('get-screen-sources')
+```
+
+**Add to `src/preload/index.d.ts`:**
+```typescript
+    interface ScreenSource {
+      id: string
+      name: string
+      thumbnail: string
+    }
+    
+    getScreenSources: () => Promise<ScreenSource[]>
+```
+
+**🧪 CHECKPOINT C.1:**
+- Run app, open DevTools
+- Test: `await window.api.getScreenSources()`
+- Should return array of screen/window sources
 
 ---
 
-## ✅ TASK C.2-C.3: Create Screen Source Picker
+## ✅ TASK C.2: Create Screen Source Picker Component
 
-(See original - code is correct)
+**📁 Files to create:**
+- `src/renderer/src/components/ScreenSourcePicker.tsx`
+
+**Full implementation:**
+
+```typescript
+import { useState, useEffect } from 'react'
+
+interface ScreenSource {
+  id: string
+  name: string
+  thumbnail: string
+}
+
+interface ScreenSourcePickerProps {
+  onSelect: (sourceId: string) => void
+  onCancel: () => void
+}
+
+function ScreenSourcePicker({ onSelect, onCancel }: ScreenSourcePickerProps) {
+  const [sources, setSources] = useState<ScreenSource[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const fetchSources = async (): Promise<void> => {
+      try {
+        const availableSources = await window.api.getScreenSources()
+        setSources(availableSources)
+        setLoading(false)
+      } catch (err) {
+        console.error('Failed to get screen sources:', err)
+        setError('Failed to load screen sources')
+        setLoading(false)
+      }
+    }
+
+    fetchSources()
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="screen-source-picker-overlay">
+        <div className="screen-source-picker-modal">
+          <h2>Loading sources...</h2>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="screen-source-picker-overlay">
+        <div className="screen-source-picker-modal">
+          <h2>Error</h2>
+          <p>{error}</p>
+          <button onClick={onCancel}>Close</button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="screen-source-picker-overlay">
+      <div className="screen-source-picker-modal">
+        <h2>Select Screen or Window</h2>
+        
+        <div className="source-grid">
+          {sources.map(source => (
+            <div
+              key={source.id}
+              className="source-item"
+              onClick={() => onSelect(source.id)}
+            >
+              <img
+                src={source.thumbnail}
+                alt={source.name}
+                className="source-thumbnail"
+              />
+              <p className="source-name">{source.name}</p>
+            </div>
+          ))}
+        </div>
+        
+        <button onClick={onCancel} className="cancel-button">
+          Cancel
+        </button>
+      </div>
+    </div>
+  )
+}
+
+export default ScreenSourcePicker
+```
+
+**🧪 CHECKPOINT C.2:**
+- Render component in test
+- Should show grid of available screens/windows
+- Thumbnails should display
+- Click should trigger onSelect callback
+
+---
+
+## ✅ TASK C.3: Add Screen Source Picker Styles
+
+**📁 Files to modify:**
+- `src/renderer/src/assets/main.css`
+
+**Add CSS:**
+
+```css
+/* Screen Source Picker */
+.screen-source-picker-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.screen-source-picker-modal {
+  background: #2a2a2a;
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 800px;
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.screen-source-picker-modal h2 {
+  margin-top: 0;
+  color: #ffffff;
+  margin-bottom: 20px;
+}
+
+.source-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.source-item {
+  background: #1a1a1a;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  padding: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.source-item:hover {
+  border-color: #646cff;
+  transform: translateY(-2px);
+}
+
+.source-thumbnail {
+  width: 100%;
+  height: auto;
+  border-radius: 4px;
+  margin-bottom: 8px;
+}
+
+.source-name {
+  color: #ffffff;
+  font-size: 14px;
+  margin: 0;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+```
 
 ---
 
@@ -741,19 +1369,32 @@ import { createFloatingRecorder, closeFloatingRecorder, updateFloatingRecorderTi
     }, 1000)
 
     function stopRecording() {
-      window.api.stopRecordingFromFloating()
+      // Send IPC message directly (window.api is exposed via preload)
+      if (window.api && window.api.stopRecordingFromFloating) {
+        window.api.stopRecordingFromFloating()
+      } else {
+        console.error('API not available')
+      }
     }
   </script>
 </body>
 </html>
 ```
 
-**Add to preload API:**
+**Add to preload API (`src/preload/index.ts`):**
 ```typescript
   startFloatingRecorder: () => ipcRenderer.invoke('start-floating-recorder'),
   stopFloatingRecorder: () => ipcRenderer.invoke('stop-floating-recorder'),
   stopRecordingFromFloating: () => ipcRenderer.invoke('stop-recording-from-floating'),
   onStopRecording: (callback) => ipcRenderer.on('stop-recording', callback)
+```
+
+**Add to preload types (`src/preload/index.d.ts`):**
+```typescript
+    startFloatingRecorder: () => Promise<void>
+    stopFloatingRecorder: () => Promise<void>
+    stopRecordingFromFloating: () => Promise<void>
+    onStopRecording: (callback: () => void) => void
 ```
 
 **🧪 CHECKPOINT C.4:**
@@ -953,7 +1594,23 @@ const handleScreenRecordingComplete = async (blob: Blob): Promise<void> => {
 
 ---
 
-# 🟢 PHASE D-H: (Remaining phases follow original plan with corrections noted below)
+# 🟢 PHASE D-H: Multi-Clip Timeline, Playback, Split, Export & Polish
+
+## 📝 Implementation Note
+
+**Phases D through H build on the multi-clip state created in Phase B.**
+
+The key corrections for these phases are shown below. For full implementation details:
+1. Refer to the MVP implementation patterns (similar component structure)
+2. Apply the state changes shown in the corrections
+3. Use the corrected code snippets as the foundation
+
+The main differences from MVP:
+- Timeline now works with `clips[]` array instead of single `videoState`
+- VideoPreview dynamically switches sources based on playhead position
+- Export logic chooses between single-clip and multi-clip handlers
+
+---
 
 ## Key Corrections for Remaining Phases:
 
@@ -1022,6 +1679,10 @@ const handleSplitClip = (): void => {
 
 ### G.1 - FFmpeg Export (SIMPLIFIED):
 ```typescript
+import path from 'path'
+import os from 'os'
+import fs from 'fs'
+
 ipcMain.handle('export-multi-clip', async (_event, { clips, outputPath }) => {
   const mainWindow = BrowserWindow.getAllWindows()[0]
   
@@ -1030,7 +1691,9 @@ ipcMain.handle('export-multi-clip', async (_event, { clips, outputPath }) => {
   let concatContent = ''
   
   for (const clip of clips) {
-    concatContent += \`file '\${clip.sourcePath}'\n\`
+    // Escape single quotes in path for concat demuxer
+    const escapedPath = clip.sourcePath.replace(/'/g, "\\'")
+    concatContent += \`file '\${escapedPath}'\n\`
     concatContent += \`inpoint \${clip.sourceStartTime}\n\`
     concatContent += \`outpoint \${clip.sourceStartTime + clip.timelineDuration}\n\`
   }
@@ -1041,7 +1704,14 @@ ipcMain.handle('export-multi-clip', async (_event, { clips, outputPath }) => {
     ffmpeg()
       .input(concatFilePath)
       .inputOptions(['-f concat', '-safe 0'])
-      .outputOptions(['-c copy'])  // Fast, no re-encode
+      // NOTE: inpoint/outpoint require re-encoding, cannot use -c copy
+      .outputOptions([
+        '-c:v libx264',
+        '-preset fast',
+        '-crf 23',
+        '-c:a aac',
+        '-b:a 192k'
+      ])
       .output(outputPath)
       .on('progress', (progress) => {
         mainWindow.webContents.send('export-progress', progress)
