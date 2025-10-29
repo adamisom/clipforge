@@ -204,14 +204,19 @@ function VideoEditor({
     const outputPath = await window.api.selectSavePath()
     if (!outputPath) return
 
-    // For now, export first clip only
-    await window.api.exportVideo(
-      currentClip.sourcePath,
-      outputPath,
-      currentClip.sourceStartTime,
-      currentClip.timelineDuration
-    )
-  }, [clips, currentClip])
+    if (clips.length === 1) {
+      // Single clip export (simple trim)
+      await window.api.exportVideo(
+        clips[0].sourcePath,
+        outputPath,
+        clips[0].sourceStartTime,
+        clips[0].timelineDuration
+      )
+    } else {
+      // Multi-clip export (concatenate)
+      await window.api.exportMultiClip(clips, outputPath)
+    }
+  }, [clips])
 
   // Listen for menu events
   useEffect(() => {

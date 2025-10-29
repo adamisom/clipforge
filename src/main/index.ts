@@ -10,6 +10,8 @@ import {
   globalShortcut
 } from 'electron'
 import { join } from 'path'
+import path from 'path'
+import os from 'os'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import ffmpeg from 'fluent-ffmpeg'
@@ -183,6 +185,115 @@ app.whenReady().then(async () => {
             reject(err)
           })
           .run()
+      })
+    }
+  )
+
+  // Multi-clip export with concatenation
+  ipcMain.handle(
+    'export-multi-clip',
+    async (
+      _event,
+      clips: Array<{
+        id: string
+        sourcePath: string
+        sourceStartTime: number
+        timelineDuration: number
+      }>,
+      outputPath: string
+    ) => {
+      const mainWindow = BrowserWindow.getAllWindows()[0]
+
+      return new Promise((resolve, reject) => {
+        // Create a temporary concat file list
+        const tmpDir = os.tmpdir()
+        const concatListPath = path.join(tmpDir, `clipforge-concat-${Date.now()}.txt`)
+
+        // Generate FFmpeg concat demuxer format
+        // For trimmed clips, we need to use complex filter instead
+        const hasTrims = clips.some(
+          (clip) => clip.sourceStartTime > 0 || clip.timelineDuration < clip.sourcePath.length
+        )
+
+        if (hasTrims) {
+          // Use complex filter for trimmed clips
+          const command = ffmpeg()
+
+          // Add all inputs
+          clips.forEach((clip) => {
+            command.input(clip.sourcePath)
+          })
+
+          // Build filter complex
+          const filterParts: string[] = []
+          clips.forEach((clip, i) => {
+            // Trim each input
+            filterParts.push(
+              `[${i}:v]trim=start=${clip.sourceStartTime}:duration=${clip.timelineDuration},setpts=PTS-STARTPTS[v${i}]`
+            )
+            filterParts.push(
+              `[${i}:a]atrim=start=${clip.sourceStartTime}:duration=${clip.timelineDuration},asetpts=PTS-STARTPTS[a${i}]`
+            )
+          })
+
+          // Concatenate all trimmed streams
+          const vInputs = clips.map((_, i) => `[v${i}]`).join('')
+          const aInputs = clips.map((_, i) => `[a${i}]`).join('')
+          filterParts.push(`${vInputs}concat=n=${clips.length}:v=1:a=0[outv]`)
+          filterParts.push(`${aInputs}concat=n=${clips.length}:v=0:a=1[outa]`)
+
+          command
+            .complexFilter(filterParts.join(';'))
+            .outputOptions(['-map', '[outv]', '-map', '[outa]'])
+            .output(outputPath)
+            .videoCodec('libx264')
+            .audioCodec('aac')
+            .on('progress', (progress) => {
+              mainWindow.webContents.send('export-progress', progress)
+            })
+            .on('end', () => {
+              mainWindow.webContents.send('export-complete')
+              resolve({ success: true })
+            })
+            .on('error', (err) => {
+              mainWindow.webContents.send('export-error', { message: err.message })
+              reject(err)
+            })
+            .run()
+        } else {
+          // Simple concat demuxer (no trimming needed)
+          const concatList = clips.map((clip) => `file '${clip.sourcePath}'`).join('\n')
+
+          fs.promises
+            .writeFile(concatListPath, concatList)
+            .then(() => {
+              ffmpeg()
+                .input(concatListPath)
+                .inputOptions(['-f', 'concat', '-safe', '0'])
+                .outputOptions(['-c', 'copy'])
+                .output(outputPath)
+                .on('progress', (progress) => {
+                  mainWindow.webContents.send('export-progress', progress)
+                })
+                .on('end', () => {
+                  // Clean up temp file
+                  fs.promises.unlink(concatListPath).catch(() => {})
+                  mainWindow.webContents.send('export-complete')
+                  resolve({ success: true })
+                })
+                .on('error', (err) => {
+                  // Clean up temp file
+                  fs.promises.unlink(concatListPath).catch(() => {})
+                  mainWindow.webContents.send('export-error', { message: err.message })
+                  reject(err)
+                })
+                .run()
+            })
+            .catch((err) => {
+              mainWindow.webContents.send('export-error', { message: err.message })
+              reject(err)
+            })
+        }
       })
     }
   )

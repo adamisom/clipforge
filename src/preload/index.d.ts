@@ -21,6 +21,15 @@ declare global {
         start: number,
         dur: number
       ) => Promise<{ success: boolean }>
+      exportMultiClip: (
+        clips: Array<{
+          id: string
+          sourcePath: string
+          sourceStartTime: number
+          timelineDuration: number
+        }>,
+        outputPath: string
+      ) => Promise<{ success: boolean }>
       selectSavePath: () => Promise<string | null>
       saveRecordingBlob: (arrayBuffer: ArrayBuffer) => Promise<string>
       saveRecordingPermanent: (tempPath: string) => Promise<{ saved: boolean; path: string }>

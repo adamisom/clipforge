@@ -10,6 +10,8 @@ const api = {
   getVideoMetadata: (path: string) => ipcRenderer.invoke('get-video-metadata', path),
   exportVideo: (sourcePath: string, outputPath: string, trimStart: number, duration: number) =>
     ipcRenderer.invoke('export-video', { sourcePath, outputPath, trimStart, duration }),
+  exportMultiClip: (clips: unknown[], outputPath: string) =>
+    ipcRenderer.invoke('export-multi-clip', clips, outputPath),
   selectSavePath: () => ipcRenderer.invoke('select-save-path'),
   saveRecordingBlob: (arrayBuffer: ArrayBuffer) =>
     ipcRenderer.invoke('save-recording-blob', arrayBuffer),
