@@ -7,6 +7,7 @@ declare global {
     api: {
       // Invoke methods (request-response)
       selectVideoFile: () => Promise<string | null>
+      resizeWindow: (width: number, height: number) => Promise<void>
       getVideoMetadata: (path: string) => Promise<{
         duration: number
         width: number

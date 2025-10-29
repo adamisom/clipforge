@@ -118,6 +118,13 @@ app.whenReady().then(async () => {
     return result.canceled ? null : result.filePaths[0]
   })
 
+  // Resize window based on content
+  ipcMain.handle('resize-window', (_event, width: number, height: number) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.setSize(Math.floor(width), Math.floor(height), true) // animate: true
+    }
+  })
+
   // Get video metadata handler
   ipcMain.handle('get-video-metadata', async (_event, path) => {
     return new Promise((resolve, reject) => {
@@ -248,6 +255,9 @@ app.whenReady().then(async () => {
 
     isRecording = true
 
+    // Unregister any existing shortcut first (in case of quick re-recording)
+    globalShortcut.unregister('CommandOrControl+Shift+S')
+
     // Register global shortcut to stop recording
     const ret = globalShortcut.register('CommandOrControl+Shift+S', () => {
       console.log('Stop recording shortcut pressed')
@@ -257,7 +267,7 @@ app.whenReady().then(async () => {
     })
 
     if (!ret) {
-      console.error('Failed to register shortcut')
+      console.warn('Shortcut registration returned false (may already be registered elsewhere)')
     }
 
     // Show notification with action

@@ -384,9 +384,10 @@ body {
 
 .recording-indicator {
   position: absolute;
-  top: 50%;
-  left: calc(50% - 400px); /* Position to the left of the modal (320px modal half-width + 80px spacing) */
-  transform: translateY(-50%);
+  top: 140px; /* Align with top of video modal (adjust as needed) */
+  left: calc(
+    50% - 400px
+  ); /* Position to the left of the modal (320px modal half-width + 80px spacing) */
   background: rgba(0, 0, 0, 0.8);
   padding: 8px 16px;
   border-radius: 20px;

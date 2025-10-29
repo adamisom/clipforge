@@ -23,8 +23,13 @@ function Timeline({
   const [dragType, setDragType] = useState<'start' | 'end' | null>(null)
   const timelineRef = useRef<HTMLDivElement>(null)
 
-  // Calculate pixels per second - 50px per second as a good starting scale
-  const pixelsPerSecond = 50
+  // Calculate pixels per second dynamically based on duration
+  // For videos <= 30s: 50px/second (nice spacing)
+  // For videos > 30s: compress to fit in ~1500px max width
+  const maxTimelineWidth = 1500
+  const standardPixelsPerSecond = 50
+  const pixelsPerSecond = duration <= 30 ? standardPixelsPerSecond : maxTimelineWidth / duration
+
   const timelineWidth = Math.max(duration * pixelsPerSecond, 800) // Minimum 800px
 
   // Generate time markers every second

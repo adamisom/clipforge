@@ -5,6 +5,8 @@ import { electronAPI } from '@electron-toolkit/preload'
 const api = {
   // Invoke methods (request-response)
   selectVideoFile: () => ipcRenderer.invoke('select-video-file'),
+  resizeWindow: (width: number, height: number) =>
+    ipcRenderer.invoke('resize-window', width, height),
   getVideoMetadata: (path: string) => ipcRenderer.invoke('get-video-metadata', path),
   exportVideo: (sourcePath: string, outputPath: string, trimStart: number, duration: number) =>
     ipcRenderer.invoke('export-video', { sourcePath, outputPath, trimStart, duration }),
