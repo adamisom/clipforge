@@ -73,8 +73,12 @@ function WebcamRecorder({ onRecordingComplete, onClose }: WebcamRecorderProps): 
     }
 
     try {
+      // Reset chunks array
+      chunksRef.current = []
+
       const mediaRecorder = new MediaRecorder(streamRef.current, {
-        mimeType: 'video/webm;codecs=vp9'
+        mimeType: 'video/webm;codecs=vp9',
+        videoBitsPerSecond: 2500000 // 2.5 Mbps
       })
 
       mediaRecorder.ondataavailable = (event) => {
@@ -84,8 +88,27 @@ function WebcamRecorder({ onRecordingComplete, onClose }: WebcamRecorderProps): 
       }
 
       mediaRecorder.onstop = () => {
+        if (chunksRef.current.length === 0) {
+          console.error('No recording data available')
+          setError('Recording failed: No data captured')
+          return
+        }
+
         const blob = new Blob(chunksRef.current, { type: 'video/webm' })
+
+        if (blob.size === 0) {
+          console.error('Recording blob is empty')
+          setError('Recording failed: File is empty')
+          return
+        }
+
+        console.log(`Recording complete: ${blob.size} bytes, ${chunksRef.current.length} chunks`)
         onRecordingComplete(blob)
+      }
+
+      mediaRecorder.onerror = (event) => {
+        console.error('MediaRecorder error:', event)
+        setError('Recording error occurred')
       }
 
       mediaRecorder.start(1000)

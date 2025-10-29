@@ -60,7 +60,13 @@ function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): 
       // Start floating recorder window
       await window.api.startFloatingRecorder()
 
-      const mediaRecorder = new MediaRecorder(mediaStream, { mimeType: 'video/webm;codecs=vp9' })
+      // Reset chunks array
+      chunksRef.current = []
+
+      const mediaRecorder = new MediaRecorder(mediaStream, {
+        mimeType: 'video/webm;codecs=vp9',
+        videoBitsPerSecond: 2500000 // 2.5 Mbps for better quality
+      })
 
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
@@ -69,12 +75,37 @@ function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): 
       }
 
       mediaRecorder.onstop = async () => {
+        // Ensure we have data
+        if (chunksRef.current.length === 0) {
+          console.error('No recording data available')
+          alert('Recording failed: No data captured')
+          await window.api.stopFloatingRecorder()
+          onClose()
+          return
+        }
+
         const blob = new Blob(chunksRef.current, { type: 'video/webm' })
+
+        // Verify blob has content
+        if (blob.size === 0) {
+          console.error('Recording blob is empty')
+          alert('Recording failed: File is empty')
+          await window.api.stopFloatingRecorder()
+          onClose()
+          return
+        }
+
+        console.log(`Recording complete: ${blob.size} bytes, ${chunksRef.current.length} chunks`)
         await window.api.stopFloatingRecorder()
         onRecordingComplete(blob)
       }
 
-      mediaRecorder.start(1000)
+      mediaRecorder.onerror = (event) => {
+        console.error('MediaRecorder error:', event)
+        alert('Recording error occurred')
+      }
+
+      mediaRecorder.start(1000) // Collect data every second
       mediaRecorderRef.current = mediaRecorder
       setStage('recording')
     } catch (err) {
