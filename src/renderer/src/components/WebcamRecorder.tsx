@@ -125,7 +125,7 @@ function WebcamRecorder({ onRecordingComplete, onClose }: WebcamRecorderProps): 
         setError('Recording error occurred')
       }
 
-      mediaRecorder.start(1000)
+      mediaRecorder.start() // No timeslice - only get data when stop() is called
       mediaRecorderRef.current = mediaRecorder
 
       // Start recording timer BEFORE setting stage to avoid re-render race
