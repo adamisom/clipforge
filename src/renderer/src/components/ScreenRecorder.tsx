@@ -11,7 +11,6 @@ function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): 
     'picker'
   )
   const [countdown, setCountdown] = useState<number | null>(null)
-  const [recordingTime, setRecordingTime] = useState(0)
   const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null)
   const [selectedSourceName, setSelectedSourceName] = useState<string | null>(null)
 
@@ -19,7 +18,6 @@ function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): 
   const chunksRef = useRef<Blob[]>([])
   const streamRef = useRef<MediaStream | null>(null)
   const hasCompletedRef = useRef(false) // Prevent double-completion
-  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const recordingStartTimeRef = useRef<number>(0)
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -93,7 +91,8 @@ function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): 
 
       // If recording own app, skip minimize. Otherwise, minimize first.
       if (isRecordingOwnApp()) {
-        // Recording own app - start immediately without minimizing
+        // Recording own app - register shortcut/notification without minimizing
+        await window.api.startRecordingNoMinimize()
         beginRecording(mediaStream)
       } else {
         // Recording other content - minimize and start recording
@@ -158,11 +157,6 @@ function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): 
       mediaRecorder.onstop = async () => {
         console.log('MediaRecorder stopped')
 
-        // Stop timer
-        if (timerIntervalRef.current) {
-          clearInterval(timerIntervalRef.current)
-        }
-
         // Calculate final duration (more accurate than state)
         const finalDuration = Math.floor((Date.now() - recordingStartTimeRef.current) / 1000)
 
@@ -217,12 +211,8 @@ function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): 
       mediaRecorderRef.current = mediaRecorder
       setStage('recording')
 
-      // Start recording timer - initialize to 0 then increment every second
-      setRecordingTime(0)
+      // Track recording start time for accurate duration calculation
       recordingStartTimeRef.current = Date.now()
-      timerIntervalRef.current = setInterval(() => {
-        setRecordingTime((prev) => prev + 1)
-      }, 1000)
     } catch (err) {
       console.error('Recording start error:', err)
       alert('Failed to start recording')
@@ -231,19 +221,21 @@ function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): 
     }
   }
 
-  // Listen for stop event from notification/shortcut/dock
+  // Listen for stop event from notification/shortcut/dock and Esc key
   useEffect(() => {
     const handleStop = (): void => {
-      if (mediaRecorderRef.current && stage === 'recording') {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
         mediaRecorderRef.current.stop()
-        // Don't stop stream here - let onstop handler do it
       }
     }
 
-    // Handle Esc key during countdown
+    // Handle Esc key during countdown - using stage state directly is fine since we want latest value
     const handleKeyDown = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape' && stage === 'countdown') {
-        handleCancelCountdown()
+      if (e.key === 'Escape') {
+        // Cancel countdown if in countdown stage
+        if (countdownIntervalRef.current) {
+          handleCancelCountdown()
+        }
       }
     }
 
@@ -253,21 +245,13 @@ function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): 
     return () => {
       window.api.removeAllListeners('stop-recording')
       window.removeEventListener('keydown', handleKeyDown)
-      // DON'T stop stream tracks in cleanup - this was causing premature stop!
-      // Stream will be stopped in mediaRecorder.onstop handler
 
-      // Cleanup countdown interval
+      // Cleanup countdown interval on unmount
       if (countdownIntervalRef.current) {
         clearInterval(countdownIntervalRef.current)
       }
     }
-  }, [stage])
-
-  const formatTime = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60)
-    const secs = seconds % 60
-    return `${mins}:${secs.toString().padStart(2, '0')}`
-  }
+  }, []) // Empty deps - only run on mount/unmount
 
   if (stage === 'picker') {
     return <ScreenSourcePicker onSelect={handleSourceSelect} onCancel={onClose} />
@@ -288,7 +272,8 @@ function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): 
             </p>
           )}
           <p>
-            To stop recording, press <kbd>Cmd+Shift+S</kbd> or click the notification.
+            On macOS, look for a notification in the menu bar. Click it to find the Stop Recording
+            button, or press <kbd>Cmd+Shift+S</kbd>.
           </p>
           <div className="ready-actions">
             <button onClick={onClose} className="cancel-button">
@@ -315,19 +300,9 @@ function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): 
     )
   }
 
-  // During recording, show a simple indicator
+  // During recording, don't show any overlay - user will use notification/shortcut to stop
   if (stage === 'recording') {
-    return (
-      <div className="recording-overlay">
-        <div className="recording-indicator-box">
-          <div className="recording-dot"></div>
-          <p>Recording in progress • {formatTime(recordingTime)}</p>
-          <p className="recording-hint">
-            Window is minimized. Press <kbd>Cmd+Shift+S</kbd> to stop, or click the notification.
-          </p>
-        </div>
-      </div>
-    )
+    return <></>
   }
 
   return <></>

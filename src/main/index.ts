@@ -295,6 +295,52 @@ app.whenReady().then(async () => {
     recordingNotification.show()
   })
 
+  // New handler: start recording without minimizing (for recording own app)
+  ipcMain.handle('start-recording-no-minimize', () => {
+    const mainWindow = BrowserWindow.getAllWindows()[0]
+
+    isRecording = true
+
+    // Unregister any existing shortcut first (in case of quick re-recording)
+    globalShortcut.unregister('CommandOrControl+Shift+S')
+
+    // Register global shortcut to stop recording
+    const ret = globalShortcut.register('CommandOrControl+Shift+S', () => {
+      console.log('Stop recording shortcut pressed')
+      if (isRecording && mainWindow) {
+        mainWindow.webContents.send('stop-recording')
+      }
+    })
+
+    if (!ret) {
+      console.warn('Shortcut registration returned false (may already be registered elsewhere)')
+    }
+
+    // Show notification with action
+    recordingNotification = new Notification({
+      title: 'Recording in Progress',
+      body: 'Press Cmd+Shift+S to stop recording',
+      silent: true,
+      actions: [{ type: 'button', text: 'Stop Recording' }]
+    })
+
+    recordingNotification.on('action', () => {
+      console.log('Stop recording from notification')
+      if (isRecording && mainWindow) {
+        mainWindow.webContents.send('stop-recording')
+      }
+    })
+
+    recordingNotification.on('click', () => {
+      console.log('Notification clicked')
+      if (isRecording && mainWindow) {
+        mainWindow.webContents.send('stop-recording')
+      }
+    })
+
+    recordingNotification.show()
+  })
+
   // Stop recording - cleanup
   ipcMain.handle('stop-recording', () => {
     isRecording = false

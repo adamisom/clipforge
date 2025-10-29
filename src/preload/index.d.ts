@@ -26,6 +26,7 @@ declare global {
       saveRecordingPermanent: (tempPath: string) => Promise<{ saved: boolean; path: string }>
       getScreenSources: () => Promise<Array<{ id: string; name: string; thumbnail: string }>>
       startRecording: () => Promise<void>
+      startRecordingNoMinimize: () => Promise<void>
       stopRecording: () => Promise<void>
       onStopRecording: (callback: () => void) => void
 

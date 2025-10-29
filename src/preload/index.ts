@@ -17,6 +17,7 @@ const api = {
     ipcRenderer.invoke('save-recording-permanent', tempPath),
   getScreenSources: () => ipcRenderer.invoke('get-screen-sources'),
   startRecording: () => ipcRenderer.invoke('start-recording'),
+  startRecordingNoMinimize: () => ipcRenderer.invoke('start-recording-no-minimize'),
   stopRecording: () => ipcRenderer.invoke('stop-recording'),
   onStopRecording: (callback) => ipcRenderer.on('stop-recording', callback),
 
