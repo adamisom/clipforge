@@ -13,6 +13,7 @@ function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
   const streamRef = useRef<MediaStream | null>(null)
+  const hasCompletedRef = useRef(false) // Prevent double-completion
 
   const handleSourceSelect = async (sourceId: string): Promise<void> => {
     try {
@@ -94,6 +95,13 @@ function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): 
 
       mediaRecorder.onstop = async () => {
         console.log('MediaRecorder stopped')
+        
+        // Prevent double-completion (can happen if component unmounts during recording)
+        if (hasCompletedRef.current) {
+          console.log('Recording already completed, ignoring duplicate onstop')
+          return
+        }
+
         // Stop all tracks
         mediaStream.getTracks().forEach((track) => {
           track.stop()
@@ -117,6 +125,7 @@ function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): 
         }
 
         console.log(`Recording complete: ${blob.size} bytes, ${chunksRef.current.length} chunks`)
+        hasCompletedRef.current = true
         await window.api.stopRecording()
         onRecordingComplete(blob)
       }

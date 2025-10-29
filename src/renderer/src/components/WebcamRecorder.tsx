@@ -16,6 +16,7 @@ function WebcamRecorder({ onRecordingComplete, onClose }: WebcamRecorderProps): 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const hasCompletedRef = useRef(false) // Prevent double-completion
 
   // Initialize webcam on mount
   useEffect(() => {
@@ -88,6 +89,12 @@ function WebcamRecorder({ onRecordingComplete, onClose }: WebcamRecorderProps): 
       }
 
       mediaRecorder.onstop = () => {
+        // Prevent double-completion (can happen if component unmounts during recording)
+        if (hasCompletedRef.current) {
+          console.log('Recording already completed, ignoring duplicate onstop')
+          return
+        }
+
         if (chunksRef.current.length === 0) {
           console.error('No recording data available')
           setError('Recording failed: No data captured')
@@ -103,6 +110,7 @@ function WebcamRecorder({ onRecordingComplete, onClose }: WebcamRecorderProps): 
         }
 
         console.log(`Recording complete: ${blob.size} bytes, ${chunksRef.current.length} chunks`)
+        hasCompletedRef.current = true
         onRecordingComplete(blob)
       }
 
