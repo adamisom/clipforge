@@ -1,6 +1,6 @@
 # ClipForge Phase 2: Implementation Plan & Task List (CORRECTED)
 
-**Recording + Multi-Clip Timeline + Split + System Audio**
+**Recording + Multi-Clip Timeline + Split + Drag-and-Drop**
 
 ---
 
@@ -9,10 +9,16 @@
 This phase adds:
 
 - **Recording**: Screen and webcam recording (one at a time)
-- **System Audio**: Capture system audio during screen recording (macOS 13+)
 - **Multi-Clip Timeline**: Support multiple clips that play sequentially
 - **Split Functionality**: Split clips at playhead position
+- **Drag-and-Drop File Import**: Enable feature-flagged drag-and-drop for video files
+- **Timeline Auto-Resize**: Dynamic timeline sizing based on total clip duration
 - **Temp File Management**: Smart cleanup of temporary recordings
+
+**Deferred to Phase 3:**
+- Drag-to-rearrange clips (reordering via drag-and-drop within timeline)
+- Clips library/bin
+- System Audio capture (requires additional research for macOS permissions)
 
 ---
 
@@ -20,16 +26,14 @@ This phase adds:
 
 ### Recording UI
 
-- **Floating recorder window** (separate BrowserWindow) during screen recording
-- Main window minimizes when recording starts
-- Floating window shows recording indicator and stop button
+- **Ready-to-record dialog** before screen recording starts (explains window will minimize)
+- Main window minimizes when screen recording starts
+- **macOS notification** with "Stop Recording" action button during recording
+- **Global keyboard shortcut** (Cmd+Shift+S) to stop recording
 - **3-2-1 countdown** before recording begins
 - **Screen picker** shows thumbnails of available screens/windows
 
-⚠️ **Note on Floating Window**: If implementing separate BrowserWindow proves difficult, fallback options:
-
-- **Option B**: Use built-in Electron overlay API (if available for macOS)
-- **Option C**: Simplified - show recording bar at top of main window (don't minimize)
+**Note:** Floating recorder window approach was simplified to notification + shortcut for better reliability.
 
 ### File Handling
 
@@ -42,9 +46,13 @@ This phase adds:
 ### Multi-Clip Behavior
 
 - **Append to end** by default (new clips added sequentially)
+- **Drag-and-drop zones** at beginning and end of timeline for prepend/append
 - **Clips snap together** (no gaps between clips)
 - **Timeline positions calculated dynamically** from clip order
 - **Auto-play across clips** (continuous playback)
+- **Timeline auto-resizes** to accommodate total duration of all clips
+  - Videos ≤30s total: 50px/second (nice spacing)
+  - Videos >30s total: compress to fit in ~1500px max width
 
 ### Split Behavior
 
