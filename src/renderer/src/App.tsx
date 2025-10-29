@@ -1,46 +1,173 @@
-import Versions from './components/Versions'
-import electronLogo from './assets/electron.svg'
+import { useState } from 'react'
+import './assets/main.css'
+import Timeline from './components/Timeline'
+import VideoPreview from './components/VideoPreview'
+
+// Type definitions
+interface VideoState {
+  sourcePath: string | null
+  duration: number
+  trimStart: number
+  trimEnd: number
+  playheadPosition: number
+  isPlaying: boolean
+  metadata: {
+    filename: string
+    resolution: string
+  }
+}
+
+// Components will be defined inline for now
+function WelcomeScreen({ onImport }: { onImport: () => void }) {
+  return (
+    <div className="welcome-screen">
+      <h1>ClipForge</h1>
+      <p>Import a video to get started</p>
+      <button onClick={onImport} className="import-button">Import Video</button>
+    </div>
+  )
+}
+
+function VideoEditor({ videoState, setVideoState }: { 
+  videoState: VideoState
+  setVideoState: React.Dispatch<React.SetStateAction<VideoState>>
+}) {
+  const handlePlayPause = () => {
+    setVideoState(prev => ({ ...prev, isPlaying: !prev.isPlaying }))
+  }
+
+  const handleTimeUpdate = (time: number) => {
+    setVideoState(prev => ({ ...prev, playheadPosition: time }))
+  }
+
+  return (
+    <div className="video-editor">
+      <VideoPreview
+        sourcePath={videoState.sourcePath}
+        trimStart={videoState.trimStart}
+        trimEnd={videoState.trimEnd}
+        playheadPosition={videoState.playheadPosition}
+        isPlaying={videoState.isPlaying}
+        onPlayPause={handlePlayPause}
+        onTimeUpdate={handleTimeUpdate}
+      />
+      <Timeline
+        duration={videoState.duration}
+        trimStart={videoState.trimStart}
+        trimEnd={videoState.trimEnd}
+        playheadPosition={videoState.playheadPosition}
+      />
+      <div className="info-panel">
+        <div className="info-content">
+          <h3>Video Info</h3>
+          <div className="info-item">
+            <strong>File:</strong> {videoState.metadata.filename}
+          </div>
+          <div className="info-item">
+            <strong>Resolution:</strong> {videoState.metadata.resolution}
+          </div>
+          <div className="info-item">
+            <strong>Duration:</strong> {Math.floor(videoState.duration)}s
+          </div>
+          <div className="info-item">
+            <strong>Trim:</strong> {Math.floor(videoState.trimStart)}s - {Math.floor(videoState.trimEnd)}s
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function App(): React.JSX.Element {
-  const ipcHandle = (): void => window.electron.ipcRenderer.send('ping')
+  const [videoState, setVideoState] = useState<VideoState>({
+    sourcePath: null,
+    duration: 0,
+    trimStart: 0,
+    trimEnd: 0,
+    playheadPosition: 0,
+    isPlaying: false,
+    metadata: { filename: '', resolution: '' }
+  })
+
+  // Import handler
+  const handleImport = async () => {
+    try {
+      const filePath = await window.api.selectVideoFile()
+      if (!filePath) return
+
+      // Get metadata
+      const metadata = await window.api.getVideoMetadata(filePath)
+
+      // Update state
+      setVideoState({
+        sourcePath: filePath,
+        duration: metadata.duration,
+        trimStart: 0,
+        trimEnd: metadata.duration,
+        playheadPosition: 0,
+        isPlaying: false,
+        metadata: {
+          filename: metadata.filename,
+          resolution: `${metadata.width}x${metadata.height}`
+        }
+      })
+    } catch (error) {
+      console.error('Import failed:', error)
+      alert(`Failed to import video: ${error}`)
+    }
+  }
 
   // Drag and drop handlers
   const handleDragOver = (e: React.DragEvent): void => {
     e.preventDefault()
   }
 
-  const handleDrop = (e: React.DragEvent): void => {
+  const handleDrop = async (e: React.DragEvent): void => {
     e.preventDefault()
-    // TODO: Implement video import when IPC handlers are set up
-    // For now, just log the files
+
     const files = Array.from(e.dataTransfer.files)
-    console.log('Files dropped:', files.map(f => f.name))
+    const videoFiles = files.filter(file => {
+      const ext = file.name.toLowerCase().split('.').pop()
+      return ['mp4', 'mov'].includes(ext || '')
+    })
+
+    if (videoFiles.length === 0) {
+      alert('Please drop a video file (MP4 or MOV)')
+      return
+    }
+
+    // Get file path (Electron provides path property)
+    const filePath = (videoFiles[0] as any).path
+    if (!filePath) return
+
+    // Call same import logic
+    try {
+      const metadata = await window.api.getVideoMetadata(filePath)
+      setVideoState({
+        sourcePath: filePath,
+        duration: metadata.duration,
+        trimStart: 0,
+        trimEnd: metadata.duration,
+        playheadPosition: 0,
+        isPlaying: false,
+        metadata: {
+          filename: metadata.filename,
+          resolution: `${metadata.width}x${metadata.height}`
+        }
+      })
+    } catch (error) {
+      console.error('Drag-and-drop import failed:', error)
+      alert(`Failed to import video: ${error}`)
+    }
   }
 
   return (
-    <div onDragOver={handleDragOver} onDrop={handleDrop}>
-      <img alt="logo" className="logo" src={electronLogo} />
-      <div className="creator">Powered by electron-vite</div>
-      <div className="text">
-        Build an Electron app with <span className="react">React</span>
-        &nbsp;and <span className="ts">TypeScript</span>
-      </div>
-      <p className="tip">
-        Please try pressing <code>F12</code> to open the devTool
-      </p>
-      <div className="actions">
-        <div className="action">
-          <a href="https://electron-vite.org/" target="_blank" rel="noreferrer">
-            Documentation
-          </a>
-        </div>
-        <div className="action">
-          <a target="_blank" rel="noreferrer" onClick={ipcHandle}>
-            Send IPC
-          </a>
-        </div>
-      </div>
-      <Versions></Versions>
+    <div onDragOver={handleDragOver} onDrop={handleDrop} style={{ width: '100%', height: '100vh' }}>
+      {!videoState.sourcePath ? (
+        <WelcomeScreen onImport={handleImport} />
+      ) : (
+        <VideoEditor videoState={videoState} setVideoState={setVideoState} />
+      )}
     </div>
   )
 }
