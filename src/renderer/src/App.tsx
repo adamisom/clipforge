@@ -45,6 +45,20 @@ function VideoEditor({
     setVideoState((prev) => ({ ...prev, playheadPosition: time }))
   }
 
+  const handleTrimChange = (newTrimStart: number, newTrimEnd: number): void => {
+    setVideoState((prev) => ({
+      ...prev,
+      trimStart: newTrimStart,
+      trimEnd: newTrimEnd,
+      // Reset playhead if it's outside new trim range
+      playheadPosition: Math.min(prev.playheadPosition, newTrimEnd - newTrimStart)
+    }))
+  }
+
+  const handlePlayheadChange = (position: number): void => {
+    setVideoState((prev) => ({ ...prev, playheadPosition: position, isPlaying: false }))
+  }
+
   return (
     <div className="video-editor">
       <div className="preview-panel">
@@ -63,6 +77,8 @@ function VideoEditor({
         trimStart={videoState.trimStart}
         trimEnd={videoState.trimEnd}
         playheadPosition={videoState.playheadPosition}
+        onTrimChange={handleTrimChange}
+        onPlayheadChange={handlePlayheadChange}
       />
       <div className="info-panel">
         <div className="info-content">
