@@ -189,19 +189,19 @@ function WebcamRecorder({ onRecordingComplete, onClose }: WebcamRecorderProps): 
 
   return (
     <div className="webcam-recorder-overlay">
+      {stage === 'recording' && (
+        <div className="recording-indicator">
+          <span className="recording-dot">●</span>
+          <span>{formatTime(recordingTime)}</span>
+        </div>
+      )}
+
       <div className="webcam-recorder-modal">
         <video ref={videoRef} autoPlay muted className="webcam-preview" />
 
         {stage === 'countdown' && countdown !== null && (
           <div className="countdown-overlay">
             <div className="countdown-number">{countdown}</div>
-          </div>
-        )}
-
-        {stage === 'recording' && (
-          <div className="recording-indicator">
-            <span className="recording-dot">●</span>
-            <span>{formatTime(recordingTime)}</span>
           </div>
         )}
 
