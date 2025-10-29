@@ -8,12 +8,22 @@ import fs from 'fs'
 
 // Set up FFmpeg binary path (dev vs production)
 const ffmpegPath = app.isPackaged ? join(process.resourcesPath, 'ffmpeg') : ffmpegInstaller.path
+const ffprobePath = app.isPackaged
+  ? join(process.resourcesPath, 'ffprobe')
+  : ffmpegInstaller.path.replace('ffmpeg', 'ffprobe')
 
 if (!fs.existsSync(ffmpegPath)) {
   console.error('FFmpeg not found at:', ffmpegPath)
 } else {
   ffmpeg.setFfmpegPath(ffmpegPath)
   console.log('FFmpeg path set to:', ffmpegPath)
+}
+
+if (!fs.existsSync(ffprobePath)) {
+  console.error('FFprobe not found at:', ffprobePath)
+} else {
+  ffmpeg.setFfprobePath(ffprobePath)
+  console.log('FFprobe path set to:', ffprobePath)
 }
 
 function createWindow(): void {

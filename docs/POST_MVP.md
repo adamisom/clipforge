@@ -9,6 +9,7 @@ This document tracks future enhancements and test additions to consider after MV
 ### Security: File URL Handling (MUST FIX BEFORE PRODUCTION)
 
 **Current Implementation:**
+
 ```typescript
 // src/main/index.ts
 webPreferences: {
@@ -21,6 +22,7 @@ webPreferences: {
 ```
 
 **Security Risks:**
+
 - `webSecurity: false` disables browser security protections
 - Vulnerable to XSS if any user content is rendered
 - `file://` URLs blocked by CORS in dev mode (http://localhost:5174)
@@ -39,7 +41,7 @@ app.whenReady().then(() => {
     const decodedPath = decodeURIComponent(url)
     callback({ path: decodedPath })
   })
-  
+
   // Remove these from webPreferences:
   // webSecurity: false ❌
   // allowRunningInsecureContent: true ❌
@@ -50,6 +52,7 @@ app.whenReady().then(() => {
 ```
 
 **Benefits:**
+
 - ✅ Maintains browser security protections
 - ✅ Works in both dev and production
 - ✅ Scoped to only serve video files

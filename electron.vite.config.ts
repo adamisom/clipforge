@@ -17,7 +17,7 @@ export default defineConfig({
     },
     plugins: [react()],
     server: {
-      port: 5174 // Try a different port to avoid permission issues
+      port: 5174
     }
   }
 })
