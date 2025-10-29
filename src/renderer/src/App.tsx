@@ -47,15 +47,17 @@ function VideoEditor({
 
   return (
     <div className="video-editor">
-      <VideoPreview
-        sourcePath={videoState.sourcePath}
-        trimStart={videoState.trimStart}
-        trimEnd={videoState.trimEnd}
-        playheadPosition={videoState.playheadPosition}
-        isPlaying={videoState.isPlaying}
-        onPlayPause={handlePlayPause}
-        onTimeUpdate={handleTimeUpdate}
-      />
+      <div className="preview-panel">
+        <VideoPreview
+          sourcePath={videoState.sourcePath}
+          trimStart={videoState.trimStart}
+          trimEnd={videoState.trimEnd}
+          playheadPosition={videoState.playheadPosition}
+          isPlaying={videoState.isPlaying}
+          onPlayPause={handlePlayPause}
+          onTimeUpdate={handleTimeUpdate}
+        />
+      </div>
       <Timeline
         duration={videoState.duration}
         trimStart={videoState.trimStart}

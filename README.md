@@ -32,3 +32,14 @@ $ npm run build:mac
 # For Linux
 $ npm run build:linux
 ```
+
+## Troubleshooting
+
+### Zoom Reset
+
+If you zoom in/out and can't get back to normal view (even after restarting the app), press:
+
+- **macOS**: `Cmd+0`
+- **Windows/Linux**: `Ctrl+0`
+
+This resets the zoom level to 100%.
