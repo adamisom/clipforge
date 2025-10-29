@@ -7,7 +7,9 @@ interface ScreenRecorderProps {
 }
 
 function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): React.JSX.Element {
-  const [stage, setStage] = useState<'picker' | 'countdown' | 'recording'>('picker')
+  const [stage, setStage] = useState<'picker' | 'ready-to-record' | 'countdown' | 'recording'>(
+    'picker'
+  )
   const [countdown, setCountdown] = useState<number | null>(null)
   const [recordingTime, setRecordingTime] = useState(0)
 
@@ -41,19 +43,8 @@ function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): 
 
       streamRef.current = mediaStream
 
-      setStage('countdown')
-      setCountdown(3)
-
-      const countdownInterval = setInterval(() => {
-        setCountdown((prev) => {
-          if (prev === null || prev <= 1) {
-            clearInterval(countdownInterval)
-            beginRecording(mediaStream)
-            return null
-          }
-          return prev - 1
-        })
-      }, 1000)
+      // Show ready dialog before starting
+      setStage('ready-to-record')
     } catch (err) {
       console.error('Screen recording error:', err)
       alert(
@@ -61,6 +52,24 @@ function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): 
       )
       onClose()
     }
+  }
+
+  const handleStartRecording = (): void => {
+    setStage('countdown')
+    setCountdown(3)
+
+    const countdownInterval = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev === null || prev <= 1) {
+          clearInterval(countdownInterval)
+          if (streamRef.current) {
+            beginRecording(streamRef.current)
+          }
+          return null
+        }
+        return prev - 1
+      })
+    }, 1000)
   }
 
   const beginRecording = async (mediaStream: MediaStream): Promise<void> => {
@@ -198,6 +207,31 @@ function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): 
 
   if (stage === 'picker') {
     return <ScreenSourcePicker onSelect={handleSourceSelect} onCancel={onClose} />
+  }
+
+  if (stage === 'ready-to-record') {
+    return (
+      <div className="countdown-overlay fullscreen">
+        <div className="ready-dialog">
+          <h2>Ready to Record</h2>
+          <p>
+            When you click Start, this window will minimize and recording will begin after a 3-2-1
+            countdown.
+          </p>
+          <p>
+            To stop recording, press <kbd>Cmd+Shift+S</kbd> or click the notification.
+          </p>
+          <div className="ready-actions">
+            <button onClick={onClose} className="cancel-button">
+              Cancel
+            </button>
+            <button onClick={handleStartRecording} className="start-button">
+              Start Recording
+            </button>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   if (stage === 'countdown' && countdown !== null) {
