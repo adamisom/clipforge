@@ -16,9 +16,6 @@ function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): 
 
   const handleSourceSelect = async (sourceId: string): Promise<void> => {
     try {
-      // Electron's desktopCapturer approach: pass sourceId to getUserMedia
-      console.log('Requesting screen capture for source:', sourceId)
-
       const constraints = {
         audio: false, // Disable audio for now
         video: {
@@ -29,13 +26,10 @@ function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): 
         }
       } as unknown as MediaStreamConstraints
 
-      console.log('getUserMedia constraints:', constraints)
       const mediaStream = await navigator.mediaDevices.getUserMedia(constraints)
-      console.log('Media stream obtained:', mediaStream)
 
       // Verify we got video tracks
       const videoTracks = mediaStream.getVideoTracks()
-      console.log('Video tracks:', videoTracks.length, videoTracks)
 
       if (videoTracks.length === 0) {
         throw new Error('No video tracks in stream')
@@ -84,66 +78,29 @@ function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): 
       })
 
       if (videoTracks.length === 0) {
-        console.error('No video track available')
         alert('No video track available')
         await window.api.stopRecording()
         onClose()
         return
       }
 
-      // Log all supported mimetypes
-      const testTypes = [
-        'video/webm',
-        'video/webm;codecs=vp8',
-        'video/webm;codecs=vp9',
-        'video/webm;codecs=h264',
-        'video/webm;codecs=vp8,opus',
-        'video/mp4'
-      ]
-      console.log('Supported mimetypes:')
-      testTypes.forEach((type) => {
-        console.log(`  ${type}: ${MediaRecorder.isTypeSupported(type)}`)
-      })
-
-      // Use the absolute simplest configuration - NO timeslice
-      console.log('Creating MediaRecorder with NO options...')
-      const mediaRecorder = new MediaRecorder(mediaStream) // No options at all!
+      const mediaRecorder = new MediaRecorder(mediaStream)
 
       mediaRecorder.ondataavailable = (event) => {
-        console.log(
-          'Data chunk received:',
-          event.data.size,
-          'bytes',
-          'at',
-          new Date().toISOString()
-        )
         if (event.data.size > 0) {
           chunksRef.current.push(event.data)
         }
       }
 
-      mediaRecorder.onstart = () => {
-        console.log('MediaRecorder onstart fired, state:', mediaRecorder.state)
-      }
-
-      mediaRecorder.onpause = () => {
-        console.log('MediaRecorder paused')
-      }
-
-      mediaRecorder.onresume = () => {
-        console.log('MediaRecorder resumed')
-      }
-
       mediaRecorder.onstop = async () => {
-        console.log('MediaRecorder onstop fired')
+        console.log('MediaRecorder stopped')
         // Stop all tracks
         mediaStream.getTracks().forEach((track) => {
-          console.log('Stopping track:', track.kind, track.id)
           track.stop()
         })
         // Ensure we have data
         if (chunksRef.current.length === 0) {
-          console.error('No recording data available after stop')
+          console.error('No recording data available')
           await window.api.stopRecording()
           onClose()
           return
@@ -165,28 +122,16 @@ function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): 
       }
 
       mediaRecorder.onerror = (event) => {
-        console.error('MediaRecorder error event:', event)
+        console.error('MediaRecorder error:', event)
         if (event.error) {
           console.error('Error details:', event.error)
         }
       }
 
-      console.log('Starting MediaRecorder...')
-
       // Small delay to ensure stream is fully ready
       await new Promise((resolve) => setTimeout(resolve, 100))
 
-      console.log('Calling mediaRecorder.start() with NO timeslice...')
-      mediaRecorder.start() // NO timeslice - only get data when we call stop()
-
-      // Check state after a brief moment
-      setTimeout(() => {
-        console.log('MediaRecorder state after 200ms:', mediaRecorder.state)
-        if (mediaRecorder.state === 'inactive') {
-          console.error('CRITICAL: MediaRecorder failed to start - still inactive after 200ms!')
-          console.error('This usually means the codec/stream combination is not supported')
-        }
-      }, 200)
+      mediaRecorder.start() // No timeslice - only get data when stop() is called
 
       mediaRecorderRef.current = mediaRecorder
       setStage('recording')
