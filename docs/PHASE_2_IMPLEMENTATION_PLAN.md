@@ -15,10 +15,7 @@ This phase adds:
 - **Timeline Auto-Resize**: Dynamic timeline sizing based on total clip duration
 - **Temp File Management**: Smart cleanup of temporary recordings
 
-**Deferred to Phase 3:**
-- Drag-to-rearrange clips (reordering via drag-and-drop within timeline)
-- Clips library/bin
-- System Audio capture (requires additional research for macOS permissions)
+> **Note:** Some features have been deferred to Phase 3. See [PHASE_3_DEFERRED.md](./PHASE_3_DEFERRED.md) for details.
 
 ---
 
