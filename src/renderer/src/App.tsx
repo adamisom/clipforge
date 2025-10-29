@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import './assets/main.css'
 import Timeline from './components/Timeline'
 import VideoPreview from './components/VideoPreview'
@@ -52,25 +52,74 @@ function VideoEditor({
   isPlaying: boolean
   setIsPlaying: (playing: boolean) => void
 }): React.JSX.Element {
-  // Show the selected clip, or first clip as fallback
-  const currentClip = selectedClipId
-    ? clips.find((c) => c.id === selectedClipId) || clips[0]
-    : clips[0]
+  // Calculate total duration and clip positions
+  const totalDuration = clips.reduce((sum, c) => sum + c.timelineDuration, 0)
+
+  const clipPositions = useMemo(() => {
+    const positions = new Map<string, { start: number; end: number }>()
+    let pos = 0
+    for (const clip of clips) {
+      positions.set(clip.id, { start: pos, end: pos + clip.timelineDuration })
+      pos += clip.timelineDuration
+    }
+    return positions
+  }, [clips])
+
+  // Determine which clip the playhead is currently in
+  const currentClip = useMemo(() => {
+    for (const clip of clips) {
+      const position = clipPositions.get(clip.id)
+      if (position && playheadPosition >= position.start && playheadPosition < position.end) {
+        return clip
+      }
+    }
+    // If playhead is at the very end or beyond, return last clip
+    return clips[clips.length - 1]
+  }, [clips, clipPositions, playheadPosition])
+
+  // Calculate playhead position relative to current clip
+  const relativePlayheadPosition = useMemo(() => {
+    if (!currentClip) return 0
+    const position = clipPositions.get(currentClip.id)
+    if (!position) return 0
+    return playheadPosition - position.start
+  }, [currentClip, clipPositions, playheadPosition])
 
   const handlePlayPause = (): void => {
     setIsPlaying(!isPlaying)
   }
 
   const handleTimeUpdate = (time: number): void => {
-    setPlayheadPosition(time)
+    if (!currentClip) return
+
+    const position = clipPositions.get(currentClip.id)
+    if (!position) return
+
+    const newPlayheadPosition = position.start + time
+
+    // Check if we've reached the end of current clip
+    if (newPlayheadPosition >= position.end) {
+      // Find next clip
+      const currentIndex = clips.findIndex((c) => c.id === currentClip.id)
+      if (currentIndex < clips.length - 1) {
+        // Auto-advance to next clip
+        const nextClip = clips[currentIndex + 1]
+        const nextPosition = clipPositions.get(nextClip.id)
+        if (nextPosition) {
+          setPlayheadPosition(nextPosition.start)
+        }
+      } else {
+        // Reached end of timeline
+        setPlayheadPosition(totalDuration)
+        setIsPlaying(false)
+      }
+    } else {
+      setPlayheadPosition(newPlayheadPosition)
+    }
   }
 
-  const handleClipSelect = (clipId: string): void => {
-    const selectedClip = clips.find((c) => c.id === clipId)
-    if (selectedClip) {
-      // TODO: Update when we implement multi-clip playback
-      // For now, just update the state
-    }
+  const handleClipSelect = (): void => {
+    // Clicking a clip doesn't change playhead, just for future features
   }
 
   const handleTrimChange = (clipId: string, newTrimStart: number, newTrimEnd: number): void => {
@@ -127,10 +176,11 @@ function VideoEditor({
       <div className="preview-panel">
         {currentClip ? (
           <VideoPreview
+            key={currentClip.id}
             sourcePath={currentClip.sourcePath}
             trimStart={currentClip.sourceStartTime}
             trimEnd={currentClip.sourceStartTime + currentClip.timelineDuration}
-            playheadPosition={playheadPosition}
+            playheadPosition={relativePlayheadPosition}
             isPlaying={isPlaying}
             onPlayPause={handlePlayPause}
             onTimeUpdate={handleTimeUpdate}
