@@ -5,30 +5,35 @@ interface TimelineProps {
   playheadPosition: number
 }
 
-function Timeline({ duration, trimStart, trimEnd, playheadPosition }: TimelineProps) {
+function Timeline({
+  duration,
+  trimStart,
+  trimEnd,
+  playheadPosition
+}: TimelineProps): React.JSX.Element {
   // Calculate pixels per second - 50px per second as a good starting scale
   const pixelsPerSecond = 50
   const timelineWidth = Math.max(duration * pixelsPerSecond, 800) // Minimum 800px
-  
+
   // Generate time markers every second
-  const timeMarkers = []
+  const timeMarkers: number[] = []
   for (let i = 0; i <= Math.ceil(duration); i++) {
     timeMarkers.push(i)
   }
-  
+
   // Format time display
   const formatTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60)
     const secs = Math.floor(seconds % 60)
     return `${mins}:${secs.toString().padStart(2, '0')}`
   }
-  
+
   return (
     <div className="timeline-panel">
       <div className="timeline-container" style={{ width: `${timelineWidth}px` }}>
         {/* Time Ruler */}
         <div className="time-ruler">
-          {timeMarkers.map(time => (
+          {timeMarkers.map((time) => (
             <div
               key={time}
               style={{
@@ -45,7 +50,7 @@ function Timeline({ duration, trimStart, trimEnd, playheadPosition }: TimelinePr
             </div>
           ))}
         </div>
-        
+
         {/* Timeline Track */}
         <div className="timeline-track">
           {/* Clip Visualization */}
@@ -60,12 +65,12 @@ function Timeline({ duration, trimStart, trimEnd, playheadPosition }: TimelinePr
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               Video Clip
             </span>
-            
+
             {/* Trim Handles */}
             <div className="trim-handle trim-handle-left" />
             <div className="trim-handle trim-handle-right" />
           </div>
-          
+
           {/* Playhead */}
           <div
             className="playhead"
@@ -80,4 +85,3 @@ function Timeline({ duration, trimStart, trimEnd, playheadPosition }: TimelinePr
 }
 
 export default Timeline
-

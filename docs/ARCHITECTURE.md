@@ -67,6 +67,7 @@ Renderer: Updates videoState
 ```
 
 **Key Points**:
+
 - All file operations happen in main process
 - Metadata extraction (ffprobe) returns filename to avoid using `path` module in renderer
 - State update triggers re-render showing VideoEditor
@@ -96,6 +97,7 @@ Renderer: Shows success message
 ```
 
 **Key Points**:
+
 - Export runs in main process (doesn't block renderer)
 - Progress communication uses `webContents.send()`, not IPC return values
 - User can't interact with timeline during export (UI disabled)
@@ -117,6 +119,7 @@ Timeline: Re-renders playhead position
 ```
 
 **Key Constraints**:
+
 - Video always plays from `trimStart` to `trimEnd`
 - Playhead represents position in trimmed section (0 to trimmed duration)
 - Playback is constrained to trimmed region
@@ -138,6 +141,7 @@ Preview updates to show frame at new position
 ```
 
 **Key Constraints**:
+
 - Playhead cannot go outside trimmed section
 - Dragging outside timeline rectangle handled by global mouseup event
 - Smooth scrubbing uses `requestAnimationFrame`
@@ -150,22 +154,23 @@ Preview updates to show frame at new position
 
 ```typescript
 interface VideoState {
-  sourcePath: string | null;     // File path on disk
-  duration: number;               // Full video duration (seconds)
-  trimStart: number;             // Trim start point (0 to duration)
-  trimEnd: number;               // Trim end point (trimStart to duration)
-  playheadPosition: number;      // Position in trimmed section (0 to trimmed duration)
-  isPlaying: boolean;             // Playback state
+  sourcePath: string | null // File path on disk
+  duration: number // Full video duration (seconds)
+  trimStart: number // Trim start point (0 to duration)
+  trimEnd: number // Trim end point (trimStart to duration)
+  playheadPosition: number // Position in trimmed section (0 to trimmed duration)
+  isPlaying: boolean // Playback state
   metadata: {
-    filename: string;             // Extracted in main process
-    resolution: string;           // e.g., "1920x1080"
-  };
+    filename: string // Extracted in main process
+    resolution: string // e.g., "1920x1080"
+  }
 }
 ```
 
 ### State Relationships
 
 **Critical Invariants**:
+
 1. `trimStart < trimEnd` (must be strictly less)
 2. `0 ≤ trimStart ≤ duration`
 3. `trimStart ≤ trimEnd ≤ duration`
@@ -184,10 +189,10 @@ const [videoState, setVideoState] = useState<VideoState>({
   playheadPosition: 0,
   isPlaying: false,
   metadata: { filename: '', resolution: '' }
-});
+})
 
 // Updates use functional form to avoid stale closures
-setVideoState(prev => ({ ...prev, trimStart: newStart }));
+setVideoState((prev) => ({ ...prev, trimStart: newStart }))
 ```
 
 **Why**: Functional updates prevent race conditions and ensure latest state is used.
@@ -224,6 +229,7 @@ App
 ```
 
 **Key Components**:
+
 - **TimelineClip**: Simple div with transform-based positioning for performance
 - **Playhead**: Always positioned above timeline track for visual clarity
 - **Trim handles**: Small draggable areas on clip edges (West/East)
@@ -240,44 +246,44 @@ ipcMain.handle('select-video-file', async () => {
   const result = await dialog.showOpenDialog({
     properties: ['openFile'],
     filters: [{ name: 'Videos', extensions: ['mp4', 'mov'] }]
-  });
-  return result.canceled ? null : result.filePaths[0];
-});
+  })
+  return result.canceled ? null : result.filePaths[0]
+})
 
 // Metadata extraction
 ipcMain.handle('get-video-metadata', async (event, path) => {
   return new Promise((resolve, reject) => {
     ffmpeg.ffprobe(path, (err, metadata) => {
-      if (err) return reject(err);
-      const videoStream = metadata.streams.find(s => s.codec_type === 'video');
+      if (err) return reject(err)
+      const videoStream = metadata.streams.find((s) => s.codec_type === 'video')
       resolve({
         duration: metadata.format.duration,
         width: videoStream.width,
         height: videoStream.height,
         codec: videoStream.codec_name,
         filename: path.split(/[/\\]/).pop()
-      });
-    });
-  });
-});
+      })
+    })
+  })
+})
 
 // Export with progress communication
 ipcMain.handle('export-video', async (event, { sourcePath, outputPath, trimStart, duration }) => {
-  const mainWindow = BrowserWindow.getAllWindows()[0];
-  
-  ffmpeg.setFfmpegPath(ffmpegPath);
+  const mainWindow = BrowserWindow.getAllWindows()[0]
+
+  ffmpeg.setFfmpegPath(ffmpegPath)
   ffmpeg(sourcePath)
     .setStartTime(trimStart)
     .setDuration(duration)
     .output(outputPath)
     .on('progress', (progress) => {
-      mainWindow.webContents.send('export-progress', progress);
+      mainWindow.webContents.send('export-progress', progress)
     })
     .on('end', () => {
-      mainWindow.webContents.send('export-complete');
+      mainWindow.webContents.send('export-complete')
     })
-    .run();
-});
+    .run()
+})
 ```
 
 ### Preload API
@@ -288,10 +294,15 @@ const api = {
   // Invoke methods (request-response)
   selectVideoFile: () => ipcRenderer.invoke('select-video-file'),
   getVideoMetadata: (path: string) => ipcRenderer.invoke('get-video-metadata', path),
-  exportVideo: (src, dest, start, dur) => 
-    ipcRenderer.invoke('export-video', { sourcePath: src, outputPath: dest, trimStart: start, duration: dur }),
+  exportVideo: (src, dest, start, dur) =>
+    ipcRenderer.invoke('export-video', {
+      sourcePath: src,
+      outputPath: dest,
+      trimStart: start,
+      duration: dur
+    }),
   selectSavePath: () => ipcRenderer.invoke('select-save-path'),
-  
+
   // Event listeners (one-way events)
   onExportProgress: (callback) => ipcRenderer.on('export-progress', callback),
   onExportComplete: (callback) => ipcRenderer.on('export-complete', callback),
@@ -299,9 +310,9 @@ const api = {
   onMenuImport: (callback) => ipcRenderer.on('menu-import', callback),
   onMenuExport: (callback) => ipcRenderer.on('menu-export', callback),
   removeAllListeners: (channel) => ipcRenderer.removeAllListeners(channel)
-};
+}
 
-contextBridge.exposeInMainWorld('api', api);
+contextBridge.exposeInMainWorld('api', api)
 ```
 
 ### TypeScript Definitions
@@ -312,25 +323,25 @@ declare global {
   interface Window {
     api: {
       // Invoke methods (request-response)
-      selectVideoFile: () => Promise<string | null>;
+      selectVideoFile: () => Promise<string | null>
       getVideoMetadata: (path: string) => Promise<{
-        duration: number;
-        width: number;
-        height: number;
-        codec: string;
-        filename: string;
-      }>;
-      exportVideo: (src: string, dest: string, start: number, dur: number) => Promise<void>;
-      selectSavePath: () => Promise<string | null>;
-      
+        duration: number
+        width: number
+        height: number
+        codec: string
+        filename: string
+      }>
+      exportVideo: (src: string, dest: string, start: number, dur: number) => Promise<void>
+      selectSavePath: () => Promise<string | null>
+
       // Event listeners (one-way events)
-      onExportProgress: (callback: (event: any, progress: any) => void) => void;
-      onExportComplete: (callback: (event: any) => void) => void;
-      onExportError: (callback: (event: any, error: { message: string }) => void) => void;
-      onMenuImport: (callback: (event: any) => void) => void;
-      onMenuExport: (callback: (event: any) => void) => void;
-      removeAllListeners: (channel: string) => void;
-    };
+      onExportProgress: (callback: (event: any, progress: any) => void) => void
+      onExportComplete: (callback: (event: any) => void) => void
+      onExportError: (callback: (event: any, error: { message: string }) => void) => void
+      onMenuImport: (callback: (event: any) => void) => void
+      onMenuExport: (callback: (event: any) => void) => void
+      removeAllListeners: (channel: string) => void
+    }
   }
 }
 ```
@@ -343,59 +354,60 @@ const menu = Menu.buildFromTemplate([
   {
     label: 'File',
     submenu: [
-      { 
-        label: 'Import Video', 
-        accelerator: 'CmdOrCtrl+O', 
-        click: () => mainWindow.webContents.send('menu-import') 
+      {
+        label: 'Import Video',
+        accelerator: 'CmdOrCtrl+O',
+        click: () => mainWindow.webContents.send('menu-import')
       },
-      { 
-        label: 'Export Video', 
-        accelerator: 'CmdOrCtrl+E', 
-        click: () => mainWindow.webContents.send('menu-export') 
+      {
+        label: 'Export Video',
+        accelerator: 'CmdOrCtrl+E',
+        click: () => mainWindow.webContents.send('menu-export')
       },
       { type: 'separator' },
       { label: 'Quit', accelerator: 'CmdOrCtrl+Q', role: 'quit' }
     ]
   }
-]);
-Menu.setApplicationMenu(menu);
+])
+Menu.setApplicationMenu(menu)
 ```
 
 ```typescript
 // Renderer listeners
 useEffect(() => {
-  window.api.onMenuImport(handleImport);
-  window.api.onMenuExport(handleExport);
-  
+  window.api.onMenuImport(handleImport)
+  window.api.onMenuExport(handleExport)
+
   return () => {
-    window.api.removeAllListeners('menu-import');
-    window.api.removeAllListeners('menu-export');
-  };
-}, []);
+    window.api.removeAllListeners('menu-import')
+    window.api.removeAllListeners('menu-export')
+  }
+}, [])
 
 // Also listen to export events
 useEffect(() => {
   window.api.onExportProgress((event, progress) => {
-    setExportProgress(progress.percent);
-  });
-  
+    setExportProgress(progress.percent)
+  })
+
   window.api.onExportComplete(() => {
     // Show success
-  });
-  
+  })
+
   window.api.onExportError((event, { message }) => {
     // Show error
-  });
-  
+  })
+
   return () => {
-    window.api.removeAllListeners('export-progress');
-    window.api.removeAllListeners('export-complete');
-    window.api.removeAllListeners('export-error');
-  };
-}, []);
+    window.api.removeAllListeners('export-progress')
+    window.api.removeAllListeners('export-complete')
+    window.api.removeAllListeners('export-error')
+  }
+}, [])
 ```
 
-**Key Pattern**: 
+**Key Pattern**:
+
 - **Synchronous operations**: Use `window.api.methodName()` for request-response
 - **Event notifications**: Use `window.api.onEventName()` for one-way events
 - All IPC access goes through controlled preload API (never direct `ipcRenderer`)
@@ -410,10 +422,11 @@ useEffect(() => {
 **Problem**: Timeline clips must re-render as playhead moves (60fps during playback)
 
 **Solution**: Transform-based positioning
+
 ```css
 .timeline-clip {
-  transform: translateX(${position}px);  /* GPU-accelerated */
-  willChange: 'transform';                /* Hint to browser */
+  transform: translateX(${position}px); /* GPU-accelerated */
+  willchange: 'transform'; /* Hint to browser */
 }
 ```
 
@@ -424,14 +437,15 @@ useEffect(() => {
 **Problem**: User drags trim handle outside component → mousemove fires but mouseup doesn't
 
 **Solution**: Global event listeners
+
 ```typescript
 useEffect(() => {
   if (isDragging) {
-    const handleMouseUp = () => setIsDragging(false);
-    window.addEventListener('mouseup', handleMouseUp);
-    return () => window.removeEventListener('mouseup', handleMouseUp);
+    const handleMouseUp = () => setIsDragging(false)
+    window.addEventListener('mouseup', handleMouseUp)
+    return () => window.removeEventListener('mouseup', handleMouseUp)
   }
-}, [isDragging]);
+}, [isDragging])
 ```
 
 ### State Update Batching
@@ -439,16 +453,17 @@ useEffect(() => {
 **Problem**: Scrubbing playhead updates state 60fps → React re-renders repeatedly
 
 **Solution**: Throttle state updates, use transform for visual updates
+
 ```typescript
-const rafRef = useRef();
+const rafRef = useRef()
 const handleMouseMove = (e) => {
-  if (rafRef.current) return;
+  if (rafRef.current) return
   rafRef.current = requestAnimationFrame(() => {
-    const newTime = calculateTime(e.clientX);
-    setPlayheadPosition(newTime);
-    rafRef.current = null;
-  });
-};
+    const newTime = calculateTime(e.clientX)
+    setPlayheadPosition(newTime)
+    rafRef.current = null
+  })
+}
 ```
 
 ---
@@ -459,20 +474,20 @@ const handleMouseMove = (e) => {
 
 ```typescript
 // In main process
-import ffmpeg from 'fluent-ffmpeg';
-import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
-import { app } from 'electron';
-import path from 'path';
+import ffmpeg from 'fluent-ffmpeg'
+import ffmpegInstaller from '@ffmpeg-installer/ffmpeg'
+import { app } from 'electron'
+import path from 'path'
 
 const ffmpegPath = app.isPackaged
-  ? path.join(process.resourcesPath, 'ffmpeg')  // Production: bundled binary
-  : ffmpegInstaller.path;                        // Development: node_modules
+  ? path.join(process.resourcesPath, 'ffmpeg') // Production: bundled binary
+  : ffmpegInstaller.path // Development: node_modules
 
-ffmpeg.setFfmpegPath(ffmpegPath);
+ffmpeg.setFfmpegPath(ffmpegPath)
 
 // Verify binary exists
 if (!fs.existsSync(ffmpegPath)) {
-  throw new Error(`FFmpeg not found at: ${ffmpegPath}`);
+  throw new Error(`FFmpeg not found at: ${ffmpegPath}`)
 }
 ```
 
@@ -480,23 +495,24 @@ if (!fs.existsSync(ffmpegPath)) {
 
 ```typescript
 ffmpeg(sourcePath)
-  .setStartTime(trimStart)              // Start trimming from here
-  .setDuration(trimEnd - trimStart)     // Keep this duration
+  .setStartTime(trimStart) // Start trimming from here
+  .setDuration(trimEnd - trimStart) // Keep this duration
   .output(outputPath)
   .on('progress', (progress) => {
     // progress.percent = 0-100
-    mainWindow.webContents.send('export-progress', progress);
+    mainWindow.webContents.send('export-progress', progress)
   })
   .on('end', () => {
-    mainWindow.webContents.send('export-complete');
+    mainWindow.webContents.send('export-complete')
   })
   .on('error', (err) => {
-    mainWindow.webContents.send('export-error', { message: err.message });
+    mainWindow.webContents.send('export-error', { message: err.message })
   })
-  .run();
+  .run()
 ```
 
 **Key Parameters**:
+
 - `setStartTime()`: Where to start in source video (in seconds)
 - `setDuration()`: How much to keep (in seconds)
 - Output format: MP4 with default codec settings
@@ -520,6 +536,7 @@ webPreferences: {
 **Why**: `file://` protocol is blocked by default. `webSecurity: false` allows loading local files.
 
 **Renderer**:
+
 ```typescript
 <video src={`file://${videoState.sourcePath}`} />
 ```
@@ -527,6 +544,7 @@ webPreferences: {
 ### Production Mode
 
 **TODO**: Migrate to custom protocol handler for security
+
 ```typescript
 // Future enhancement
 protocol.registerFileProtocol('clipforge', (request, callback) => {
@@ -552,19 +570,19 @@ protocol.registerFileProtocol('clipforge', (request, callback) => {
 
 ```typescript
 // Playhead position on timeline (absolute)
-const playheadAbsolutePosition = trimStart + playheadPosition;
+const playheadAbsolutePosition = trimStart + playheadPosition
 
 // Clip position on timeline (absolute)
-const clipPosition = trimStart * pixelsPerSecond;
+const clipPosition = trimStart * pixelsPerSecond
 
 // Playhead visual position (pixels)
-const playheadPixelPosition = playheadPosition * pixelsPerSecond;
+const playheadPixelPosition = playheadPosition * pixelsPerSecond
 ```
 
 ### Pixels Per Second
 
 ```typescript
-const pixelsPerSecond = (timelineWidth / duration);
+const pixelsPerSecond = timelineWidth / duration
 // Example: 800px timeline, 30s video = 26.67 px/s
 ```
 
@@ -604,7 +622,7 @@ User clicks Export
 
 ```typescript
 try {
-  const metadata = await window.api.getVideoMetadata(filePath);
+  const metadata = await window.api.getVideoMetadata(filePath)
 } catch (error) {
   // Error types:
   // - File not found
@@ -626,14 +644,14 @@ useEffect(() => {
     // - Invalid parameters
     // - Export cancelled
     // Show error modal
-  };
-  
-  window.api.onExportError(handleExportError);
-  
+  }
+
+  window.api.onExportError(handleExportError)
+
   return () => {
-    window.api.removeAllListeners('export-error');
-  };
-}, []);
+    window.api.removeAllListeners('export-error')
+  }
+}, [])
 ```
 
 ### Playback Errors
@@ -645,7 +663,7 @@ videoRef.current.onerror = () => {
   // - File can't be decoded
   // - Network error (if using URL)
   // Fall back to audio-only or show error
-};
+}
 ```
 
 ---
@@ -655,46 +673,51 @@ videoRef.current.onerror = () => {
 ### Unit Tests
 
 **Targets**:
+
 - State validation functions
 - Time formatting utilities
 - Trim boundary checks
 - Timeline calculations
 
 **Example**:
+
 ```typescript
 describe('trim validation', () => {
   it('rejects trimStart >= trimEnd', () => {
-    expect(validateTrim(5, 5)).toBe(false);
-    expect(validateTrim(6, 5)).toBe(false);
-  });
-  
+    expect(validateTrim(5, 5)).toBe(false)
+    expect(validateTrim(6, 5)).toBe(false)
+  })
+
   it('accepts valid trim range', () => {
-    expect(validateTrim(0, 10)).toBe(true);
-    expect(validateTrim(5, 10)).toBe(true);
-  });
-});
+    expect(validateTrim(0, 10)).toBe(true)
+    expect(validateTrim(5, 10)).toBe(true)
+  })
+})
 ```
 
 ### Integration Tests
 
 **Targets**:
+
 - IPC communication
 - FFmpeg metadata extraction
 - Export functionality
 
 **Example**:
+
 ```typescript
 it('should extract video metadata', async () => {
-  const metadata = await window.api.getVideoMetadata(testVideoPath);
-  expect(metadata.duration).toBeGreaterThan(0);
-  expect(metadata.width).toBe(1920);
-  expect(metadata.height).toBe(1080);
-});
+  const metadata = await window.api.getVideoMetadata(testVideoPath)
+  expect(metadata.duration).toBeGreaterThan(0)
+  expect(metadata.width).toBe(1920)
+  expect(metadata.height).toBe(1080)
+})
 ```
 
 ### E2E Tests
 
 **Targets**:
+
 - Full import → trim → export workflow
 - Multiple file formats
 - Large file handling
@@ -709,8 +732,8 @@ it('should extract video metadata', async () => {
 ```yaml
 # electron-builder.yml
 extraResources:
-  - from: "node_modules/@ffmpeg-installer/darwin-x64/ffmpeg"
-    to: "ffmpeg"
+  - from: 'node_modules/@ffmpeg-installer/darwin-x64/ffmpeg'
+    to: 'ffmpeg'
 ```
 
 **Why**: FFmpeg binary must be outside `.asar` archive (cannot execute files inside .asar).
@@ -734,22 +757,26 @@ Output: `.dmg` file in `dist/` directory
 ## Future Enhancements (Post-MVP)
 
 ### Recording Features
+
 - Screen recording with desktopCapturer
 - Webcam recording
 - Simultaneous screen + webcam
 
 ### Timeline Enhancements
+
 - Multiple clips
 - Drag-and-drop to reorder
 - Split clips
 - Two-track timeline (overlays)
 
 ### Export Enhancements
+
 - Resolution options (720p, 1080p, source)
 - Export presets
 - Background export (continue editing)
 
 ### UI Enhancements
+
 - Keyboard shortcuts
 - Undo/redo
 - Timeline zoom
@@ -759,4 +786,3 @@ Output: `.dmg` file in `dist/` directory
 
 **Last Updated**: October 27, 2024
 **Version**: MVP v1.0
-

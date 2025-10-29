@@ -7,8 +7,9 @@ body {
   overflow: hidden;
   background-color: #1a1a1a;
   color: #fff;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell',
+    'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
 }
 
 #root {
@@ -43,7 +44,7 @@ body {
 .import-button {
   padding: 12px 32px;
   font-size: 16px;
-  background: #007AFF;
+  background: #007aff;
   color: white;
   border: none;
   border-radius: 8px;
@@ -52,7 +53,7 @@ body {
 }
 
 .import-button:hover {
-  background: #0066FF;
+  background: #0066ff;
 }
 
 /* Video Editor Layout */
@@ -149,7 +150,7 @@ body {
 .timeline-clip {
   position: absolute;
   height: 60px;
-  background: #4A90E2;
+  background: #4a90e2;
   border-radius: 4px;
   color: #fff;
   display: flex;
@@ -167,14 +168,14 @@ body {
   top: 0;
   bottom: 0;
   width: 8px;
-  background: #007AFF;
+  background: #007aff;
   opacity: 0.7;
   cursor: ew-resize;
 }
 
 .trim-handle:hover {
   opacity: 1;
-  background: #0066FF;
+  background: #0066ff;
 }
 
 .trim-handle-left {
@@ -230,7 +231,7 @@ body {
 
 .video-controls button {
   padding: 8px 16px;
-  background: #007AFF;
+  background: #007aff;
   color: white;
   border: none;
   border-radius: 4px;
@@ -239,14 +240,14 @@ body {
 }
 
 .video-controls button:hover {
-  background: #0066FF;
+  background: #0066ff;
 }
 
 /* Export Button */
 .export-button {
   padding: 12px 24px;
   font-size: 16px;
-  background: #007AFF;
+  background: #007aff;
   color: white;
   border: none;
   border-radius: 8px;
@@ -261,5 +262,5 @@ body {
 }
 
 .export-button:hover:not(:disabled) {
-  background: #0066FF;
+  background: #0066ff;
 }

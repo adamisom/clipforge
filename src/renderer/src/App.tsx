@@ -18,26 +18,31 @@ interface VideoState {
 }
 
 // Components will be defined inline for now
-function WelcomeScreen({ onImport }: { onImport: () => void }) {
+function WelcomeScreen({ onImport }: { onImport: () => void }): React.JSX.Element {
   return (
     <div className="welcome-screen">
       <h1>ClipForge</h1>
       <p>Import a video to get started</p>
-      <button onClick={onImport} className="import-button">Import Video</button>
+      <button onClick={onImport} className="import-button">
+        Import Video
+      </button>
     </div>
   )
 }
 
-function VideoEditor({ videoState, setVideoState }: { 
+function VideoEditor({
+  videoState,
+  setVideoState
+}: {
   videoState: VideoState
   setVideoState: React.Dispatch<React.SetStateAction<VideoState>>
-}) {
-  const handlePlayPause = () => {
-    setVideoState(prev => ({ ...prev, isPlaying: !prev.isPlaying }))
+}): React.JSX.Element {
+  const handlePlayPause = (): void => {
+    setVideoState((prev) => ({ ...prev, isPlaying: !prev.isPlaying }))
   }
 
-  const handleTimeUpdate = (time: number) => {
-    setVideoState(prev => ({ ...prev, playheadPosition: time }))
+  const handleTimeUpdate = (time: number): void => {
+    setVideoState((prev) => ({ ...prev, playheadPosition: time }))
   }
 
   return (
@@ -70,7 +75,8 @@ function VideoEditor({ videoState, setVideoState }: {
             <strong>Duration:</strong> {Math.floor(videoState.duration)}s
           </div>
           <div className="info-item">
-            <strong>Trim:</strong> {Math.floor(videoState.trimStart)}s - {Math.floor(videoState.trimEnd)}s
+            <strong>Trim:</strong> {Math.floor(videoState.trimStart)}s -{' '}
+            {Math.floor(videoState.trimEnd)}s
           </div>
         </div>
       </div>
@@ -90,7 +96,7 @@ function App(): React.JSX.Element {
   })
 
   // Import handler
-  const handleImport = async () => {
+  const handleImport = async (): Promise<void> => {
     try {
       const filePath = await window.api.selectVideoFile()
       if (!filePath) return
@@ -122,11 +128,11 @@ function App(): React.JSX.Element {
     e.preventDefault()
   }
 
-  const handleDrop = async (e: React.DragEvent): void => {
+  const handleDrop = async (e: React.DragEvent): Promise<void> => {
     e.preventDefault()
 
     const files = Array.from(e.dataTransfer.files)
-    const videoFiles = files.filter(file => {
+    const videoFiles = files.filter((file) => {
       const ext = file.name.toLowerCase().split('.').pop()
       return ['mp4', 'mov'].includes(ext || '')
     })
@@ -137,7 +143,7 @@ function App(): React.JSX.Element {
     }
 
     // Get file path (Electron provides path property)
-    const filePath = (videoFiles[0] as any).path
+    const filePath = (videoFiles[0] as File & { path: string }).path
     if (!filePath) return
 
     // Call same import logic

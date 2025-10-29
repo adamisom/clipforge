@@ -7,9 +7,7 @@ import ffmpegInstaller from '@ffmpeg-installer/ffmpeg'
 import fs from 'fs'
 
 // Set up FFmpeg binary path (dev vs production)
-const ffmpegPath = app.isPackaged
-  ? join(process.resourcesPath, 'ffmpeg')
-  : ffmpegInstaller.path
+const ffmpegPath = app.isPackaged ? join(process.resourcesPath, 'ffmpeg') : ffmpegInstaller.path
 
 if (!fs.existsSync(ffmpegPath)) {
   console.error('FFmpeg not found at:', ffmpegPath)
@@ -28,10 +26,10 @@ function createWindow(): void {
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
-      contextIsolation: true,     // CRITICAL: Isolates renderer from Electron APIs
-      nodeIntegration: false,     // CRITICAL: Prevents direct Node.js access in renderer
+      contextIsolation: true, // CRITICAL: Isolates renderer from Electron APIs
+      nodeIntegration: false, // CRITICAL: Prevents direct Node.js access in renderer
       sandbox: false,
-      webSecurity: false          // Required for file:// URLs in development
+      webSecurity: false // Required for file:// URLs in development
     }
   })
 
@@ -68,7 +66,7 @@ app.whenReady().then(() => {
   })
 
   // IPC Handlers for video operations
-  
+
   // File selection handler
   ipcMain.handle('select-video-file', async () => {
     const result = await dialog.showOpenDialog({
@@ -86,13 +84,13 @@ app.whenReady().then(() => {
           reject(err)
           return
         }
-        
-        const videoStream = metadata.streams.find(s => s.codec_type === 'video')
+
+        const videoStream = metadata.streams.find((s) => s.codec_type === 'video')
         if (!videoStream) {
           reject(new Error('No video stream found'))
           return
         }
-        
+
         resolve({
           duration: metadata.format.duration,
           width: videoStream.width,
@@ -114,28 +112,31 @@ app.whenReady().then(() => {
   })
 
   // Export video handler
-  ipcMain.handle('export-video', async (_event, { sourcePath, outputPath, trimStart, duration }) => {
-    const mainWindow = BrowserWindow.getAllWindows()[0]
-    
-    return new Promise((resolve, reject) => {
-      ffmpeg(sourcePath)
-        .setStartTime(trimStart)
-        .setDuration(duration)
-        .output(outputPath)
-        .on('progress', (progress) => {
-          mainWindow.webContents.send('export-progress', progress)
-        })
-        .on('end', () => {
-          mainWindow.webContents.send('export-complete')
-          resolve({ success: true })
-        })
-        .on('error', (err) => {
-          mainWindow.webContents.send('export-error', { message: err.message })
-          reject(err)
-        })
-        .run()
-    })
-  })
+  ipcMain.handle(
+    'export-video',
+    async (_event, { sourcePath, outputPath, trimStart, duration }) => {
+      const mainWindow = BrowserWindow.getAllWindows()[0]
+
+      return new Promise((resolve, reject) => {
+        ffmpeg(sourcePath)
+          .setStartTime(trimStart)
+          .setDuration(duration)
+          .output(outputPath)
+          .on('progress', (progress) => {
+            mainWindow.webContents.send('export-progress', progress)
+          })
+          .on('end', () => {
+            mainWindow.webContents.send('export-complete')
+            resolve({ success: true })
+          })
+          .on('error', (err) => {
+            mainWindow.webContents.send('export-error', { message: err.message })
+            reject(err)
+          })
+          .run()
+      })
+    }
+  )
 
   createWindow()
 

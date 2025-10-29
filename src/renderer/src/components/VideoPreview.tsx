@@ -18,7 +18,7 @@ function VideoPreview({
   isPlaying,
   onPlayPause,
   onTimeUpdate
-}: VideoPreviewProps) {
+}: VideoPreviewProps): React.JSX.Element {
   const videoRef = useRef<HTMLVideoElement>(null)
 
   // Sync video playback state
@@ -46,11 +46,11 @@ function VideoPreview({
   }, [sourcePath, trimStart])
 
   // Handle time updates during playback
-  const handleTimeUpdate = () => {
+  const handleTimeUpdate = (): void => {
     if (!videoRef.current) return
-    
+
     const currentTime = videoRef.current.currentTime
-    
+
     // Check if we've reached the trim end
     if (currentTime >= trimEnd) {
       videoRef.current.pause()
@@ -78,9 +78,7 @@ function VideoPreview({
             }}
           />
           <div className="video-controls">
-            <button onClick={onPlayPause}>
-              {isPlaying ? 'Pause' : 'Play'}
-            </button>
+            <button onClick={onPlayPause}>{isPlaying ? 'Pause' : 'Play'}</button>
           </div>
         </>
       ) : (
@@ -91,4 +89,3 @@ function VideoPreview({
 }
 
 export default VideoPreview
-
