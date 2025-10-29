@@ -14,20 +14,33 @@ function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
 
-  const handleSourceSelect = async (): Promise<void> => {
+  const handleSourceSelect = async (sourceId: string): Promise<void> => {
     try {
-      // Use getDisplayMedia instead of desktopCapturer + getUserMedia
-      // This is more reliable for screen recording in Electron
-      console.log('Requesting screen capture via getDisplayMedia...')
+      // Electron's desktopCapturer approach: pass sourceId to getUserMedia
+      console.log('Requesting screen capture for source:', sourceId)
 
-      const mediaStream = await navigator.mediaDevices.getDisplayMedia({
+      const constraints = {
         audio: false, // Disable audio for now
         video: {
-          cursor: 'always'
+          mandatory: {
+            chromeMediaSource: 'desktop',
+            chromeMediaSourceId: sourceId
+          }
         }
-      } as MediaStreamConstraints)
+      } as unknown as MediaStreamConstraints
 
+      console.log('getUserMedia constraints:', constraints)
+      const mediaStream = await navigator.mediaDevices.getUserMedia(constraints)
       console.log('Media stream obtained:', mediaStream)
+
+      // Verify we got video tracks
+      const videoTracks = mediaStream.getVideoTracks()
+      console.log('Video tracks:', videoTracks.length, videoTracks)
+
+      if (videoTracks.length === 0) {
+        throw new Error('No video tracks in stream')
+      }
+
       setStream(mediaStream)
 
       setStage('countdown')
@@ -92,8 +105,8 @@ function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): 
         console.log(`  ${type}: ${MediaRecorder.isTypeSupported(type)}`)
       })
 
-      // Use the absolute simplest configuration
-      console.log('Creating MediaRecorder with NO options (let browser decide everything)...')
+      // Use the absolute simplest configuration - NO timeslice
+      console.log('Creating MediaRecorder with NO options...')
       const mediaRecorder = new MediaRecorder(mediaStream) // No options at all!
 
       mediaRecorder.ondataavailable = (event) => {
@@ -163,8 +176,8 @@ function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): 
       // Small delay to ensure stream is fully ready
       await new Promise((resolve) => setTimeout(resolve, 100))
 
-      console.log('Calling mediaRecorder.start(1000)...')
-      mediaRecorder.start(1000) // Collect data every second
+      console.log('Calling mediaRecorder.start() with NO timeslice...')
+      mediaRecorder.start() // NO timeslice - only get data when we call stop()
 
       // Check state after a brief moment
       setTimeout(() => {

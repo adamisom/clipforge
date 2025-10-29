@@ -71,6 +71,17 @@ function createWindow(): void {
     return { action: 'deny' }
   })
 
+  // Enable getDisplayMedia by handling the permission request
+  mainWindow.webContents.session.setPermissionRequestHandler(
+    (_webContents, permission, callback) => {
+      if (permission === 'media') {
+        callback(true) // Allow media access for getDisplayMedia
+      } else {
+        callback(false)
+      }
+    }
+  )
+
   // HMR for renderer base on electron-vite cli.
   // Load the remote URL for development or the local html file for production.
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
