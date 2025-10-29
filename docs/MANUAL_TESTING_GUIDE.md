@@ -1,19 +1,24 @@
 # ClipForge Manual Testing Guide
 
-## ⚡ TLDR Smoke Test (2 minutes)
+**Version:** MVP + Phase 2 (Multi-Clip, Recording, Split)  
+**Last Updated:** October 29, 2025
 
-**Quick sanity check:** Import video → plays → trim handles work → scrub playhead → export → video trims correctly. If all work, you're good. If any fail, dig deeper below.
+## ⚡ TLDR Smoke Test (3 minutes)
+
+**Quick sanity check:** Import video → plays → record webcam → multiple clips on timeline → trim/split → playback across clips → export → video correct. If all work, you're good!
 
 ---
 
-## 🚀 Quick Smoke Test (5 minutes)
+## 🚀 Quick Smoke Test (10 minutes)
 
-**Purpose:** Verify core functionality is working
+**Purpose:** Verify core functionality including Phase 2 features
 
 ### Prerequisites
 
 - Sample video file (MP4 or MOV)
 - Built/running ClipForge app
+- Webcam access (for recording test)
+- Screen Recording permission (macOS)
 
 ### Steps
 
@@ -28,44 +33,56 @@
    - ✅ Timeline appears with video clip
    - ✅ Info panel shows: filename, resolution, duration, trim range
 
-3. **Playback**
+3. **Record Webcam**
+   - Click "Test Webcam" button
+   - ✅ Webcam preview appears with countdown
+   - ✅ Recording timer counts up
+   - ✅ Click "Stop" to end recording
+   - ✅ Save dialog appears
+   - ✅ Recording added to timeline with ⚠️ indicator
+
+4. **Multi-Clip Timeline**
+   - ✅ Both clips appear on timeline
+   - ✅ Clips snap together (no gaps)
+   - ✅ Click clip to select (green border)
+   - ✅ Timeline auto-resizes for total duration
+
+5. **Playback Across Clips**
    - Click "Play" button
-   - ✅ Video plays
-   - ✅ Playhead (red line) moves along timeline
-   - ✅ Playback stops at trim end
-   - Click "Pause"
-   - ✅ Video pauses
+   - ✅ Video plays through first clip
+   - ✅ Auto-advances to second clip seamlessly
+   - ✅ Playhead moves continuously across clips
+   - ✅ Stops at end of timeline
 
-4. **Trim**
-   - Drag left trim handle (blue) to 2 seconds
-   - ✅ Clip shortens from left
-   - ✅ Trim info updates in panel
-   - Drag right trim handle to -2 seconds from end
-   - ✅ Clip shortens from right
-   - ✅ Play button starts from new trim start
+6. **Split Functionality**
+   - Position playhead mid-clip, press `Cmd+K`
+   - ✅ Clip splits into two
+   - ✅ Both pieces appear on timeline
+   - ✅ Playback works across split
 
-5. **Scrubbing**
-   - Drag playhead (red line) left/right
-   - ✅ Video scrubs to new position
-   - ✅ Preview updates to show frame at playhead
+7. **Trim Individual Clips**
+   - Click clip to select
+   - ✅ Trim handles appear only on selected clip
+   - Drag trim handles
+   - ✅ Only selected clip trims
+   - ✅ Other clips unaffected
 
-6. **Export**
+8. **Export Multi-Clip**
    - Click "Export Video" button
    - ✅ Save dialog opens
    - Choose location, click Save
-   - ✅ Progress bar appears and fills
-   - ✅ "Export completed successfully!" alert appears
-   - Open exported video in player
-   - ✅ Video plays correctly
-   - ✅ Trim applied (duration matches trimmed range)
+   - ✅ Progress bar appears
+   - ✅ Export completes successfully
+   - Open exported video
+   - ✅ All clips concatenated correctly
+   - ✅ Trims applied correctly
 
-7. **Keyboard Shortcuts**
-   - Press `Cmd+O` (macOS) or `Ctrl+O` (Windows)
-   - ✅ Import dialog opens
-   - Press `Cmd+E` (macOS) or `Ctrl+E` (Windows)
-   - ✅ Export dialog opens (if video loaded)
+9. **Temp File Warning**
+   - Try to quit app with unsaved recordings
+   - ✅ Warning dialog appears
+   - ✅ "Quit Anyway" or "Cancel" options work
 
-**Result:** If all ✅ pass, core functionality is working!
+**Result:** If all ✅ pass, core functionality + Phase 2 features are working!
 
 ---
 
@@ -358,7 +375,255 @@
 
 ---
 
-### 12. Multi-Platform Tests (if applicable)
+### 12. Recording Tests (Phase 2)
+
+#### 12.1 Webcam Recording
+
+- [ ] Click "Test Webcam" button
+- [ ] Webcam preview appears
+- [ ] 3-2-1 countdown displays
+- [ ] Recording starts after countdown
+- [ ] Recording timer counts up accurately
+- [ ] Click "Stop Recording" button
+- [ ] Save dialog appears
+- [ ] Recording saved to chosen location
+- [ ] Recording added to timeline automatically
+- [ ] Temp file indicator (⚠️) shows if not saved permanently
+- [ ] Recording plays correctly in preview
+
+#### 12.2 Screen Recording
+
+- [ ] Click "Test Screen" button
+- [ ] Screen source picker appears with thumbnails
+- [ ] Select entire screen → "Ready to Record" dialog shows
+- [ ] Click "Start Recording" → Countdown shows
+- [ ] App minimizes after countdown (if not recording itself)
+- [ ] macOS notification appears with "Stop Recording" button
+- [ ] Press `Cmd+Shift+S` → Recording stops
+- [ ] OR click notification button → Recording stops
+- [ ] Save dialog appears
+- [ ] Recording saved correctly
+- [ ] Recording added to timeline with ⚠️ indicator
+- [ ] Recording content is correct (captured screen)
+
+#### 12.3 Screen Recording - Special Cases
+
+- [ ] Select "ClipForge" or "Electron" window → App doesn't minimize
+- [ ] Countdown still shows when recording self
+- [ ] Recording captures the app correctly
+- [ ] Press Esc during countdown → Recording cancels
+- [ ] No permission granted → Clear error message with instructions
+
+#### 12.4 Recording Quality
+
+- [ ] Webcam recording is clear (not pixelated)
+- [ ] Screen recording is sharp
+- [ ] Recording duration matches timer display
+- [ ] Audio (if enabled) syncs with video
+- [ ] No dropped frames or stuttering
+
+---
+
+### 13. Multi-Clip Timeline Tests (Phase 2)
+
+#### 13.1 Multiple Clips Display
+
+- [ ] Import 2+ videos → All appear on timeline
+- [ ] Clips snap together (no gaps)
+- [ ] Clip positions calculated correctly (sequential)
+- [ ] Timeline width auto-resizes for total duration
+- [ ] Timeline compresses for long total duration (>30s)
+- [ ] Each clip shows filename
+- [ ] Temp files show ⚠️ indicator
+
+#### 13.2 Clip Selection
+
+- [ ] Click clip → Green border appears
+- [ ] Click different clip → Selection changes
+- [ ] Selected clip info shows in panel
+- [ ] Trim handles only appear on selected clip
+- [ ] Playhead can move across all clips
+
+#### 13.3 Per-Clip Trimming
+
+- [ ] Select clip, drag trim handle → Only that clip trims
+- [ ] Other clips unaffected by trim
+- [ ] Timeline positions update correctly after trim
+- [ ] Total duration updates in timeline
+- [ ] Playback respects per-clip trimming
+
+#### 13.4 Clip Visual Indicators
+
+- [ ] Temp files have orange border + ⚠️ icon
+- [ ] Saved files have default blue border
+- [ ] Selected clip has green border
+- [ ] Hover shows clip details in tooltip
+
+---
+
+### 14. Multi-Clip Playback Tests (Phase 2)
+
+#### 14.1 Sequential Playback
+
+- [ ] Play with multiple clips → Plays first clip
+- [ ] Reaches end of first clip → Auto-advances to second
+- [ ] Playback continues seamlessly (no pause/gap)
+- [ ] Playhead moves continuously across clips
+- [ ] Reaches end of last clip → Stops
+
+#### 14.2 Cross-Clip Seeking
+
+- [ ] Drag playhead from clip 1 to clip 2 → Video changes
+- [ ] Preview shows correct frame at playhead position
+- [ ] Playback resumes from new position in new clip
+- [ ] Seeking back and forth works smoothly
+
+#### 14.3 Playback Edge Cases
+
+- [ ] Play from middle of clip 1 → Continues to clip 2
+- [ ] Play from last clip → Stops at end
+- [ ] Pause in clip 1, resume → Continues correctly
+- [ ] Seek while playing → Playback updates immediately
+
+---
+
+### 15. Split Functionality Tests (Phase 2)
+
+#### 15.1 Basic Split
+
+- [ ] Position playhead mid-clip, press `Cmd+K`
+- [ ] Clip splits into two pieces
+- [ ] Both pieces appear on timeline
+- [ ] Original clip removed from timeline
+- [ ] Split point is accurate (matches playhead)
+- [ ] Both pieces reference same source file
+
+#### 15.2 Split Validation
+
+- [ ] Try split at 0.05s from start → Ignored (too close to edge)
+- [ ] Try split at 0.05s from end → Ignored (too close to edge)
+- [ ] Split at exact middle → Creates equal pieces
+- [ ] Split multiple times → Each split works correctly
+
+#### 15.3 Split and Trim
+
+- [ ] Split clip, then trim first piece → Works
+- [ ] Split clip, then trim second piece → Works
+- [ ] Trim clip, then split → Works
+- [ ] Trimmed portions preserved correctly
+
+#### 15.4 Split and Playback
+
+- [ ] Split clip → Playback works across split
+- [ ] No audio/video glitch at split point
+- [ ] Seeking across split point works
+
+---
+
+### 16. Multi-Clip Export Tests (Phase 2)
+
+#### 16.1 Export Mode Detection
+
+- [ ] Export single clip → Uses simple trim (fast)
+- [ ] Export multiple untrimmed clips → Uses concat demuxer (-c copy)
+- [ ] Export multiple trimmed clips → Uses complex filter (re-encode)
+- [ ] Export decision logged correctly
+
+#### 16.2 Multi-Clip Export Validation
+
+- [ ] Export 2 clips → Both in output video
+- [ ] Export 5+ clips → All concatenated correctly
+- [ ] Clips in correct order in output
+- [ ] No gaps between clips in output
+- [ ] Total duration matches timeline total
+
+#### 16.3 Export with Trimming
+
+- [ ] Export trimmed clips → Trims applied correctly
+- [ ] Each clip starts/ends at trimmed points
+- [ ] No extra frames from untrimmed portions
+
+#### 16.4 Export Edge Cases
+
+- [ ] Export with mix of trimmed/untrimmed → Works
+- [ ] Export with very short clips (< 1s) → Works
+- [ ] Export 10+ clips → Completes successfully
+- [ ] Export with mixed formats (MP4 + MOV sources) → Works
+
+---
+
+### 17. Temp File Management Tests (Phase 2)
+
+#### 17.1 Temp File Creation
+
+- [ ] Record webcam → Temp file created in /tmp
+- [ ] Temp filename format: `clipforge-recording-YYYY-MM-DD-HH-MM-SS.webm`
+- [ ] Temp file has valid content (not empty)
+
+#### 17.2 Temp File Indicators
+
+- [ ] Unsaved recording shows ⚠️ on timeline
+- [ ] Unsaved recording has orange border
+- [ ] Hover shows "Unsaved recording" tooltip
+- [ ] After saving permanently → Indicator disappears
+
+#### 17.3 Quit Warning
+
+- [ ] Quit with unsaved recordings → Warning dialog shows
+- [ ] Dialog shows correct message
+- [ ] Click "Cancel" → App doesn't quit
+- [ ] Click "Quit Anyway" → App quits, temp files deleted
+- [ ] Quit with no temp files → No warning, quits immediately
+
+#### 17.4 Temp File Cleanup
+
+- [ ] Restart app → Old temp files deleted automatically
+- [ ] Temp directory size checked on new recording
+- [ ] Exceeding 5GB limit → Error shown, user warned
+
+---
+
+### 18. Drag-and-Drop Tests (Phase 2)
+
+#### 18.1 Basic Drag-and-Drop
+
+- [ ] Drag MP4 file onto welcome screen → Imports
+- [ ] Drag MOV file onto app window → Imports
+- [ ] Drag multiple files → First file imported (or error shown)
+- [ ] Drag hint appears on welcome screen
+
+#### 18.2 Drag-and-Drop Validation
+
+- [ ] Drag non-video file → Error message
+- [ ] Drag unsupported format → Error message
+- [ ] Drag outside app window → No action
+- [ ] Drop while video loaded → Adds to timeline (or replaces)
+
+---
+
+### 19. Keyboard Shortcuts Tests (Updated)
+
+#### 19.1 File Menu
+
+- [ ] `Cmd/Ctrl+O` → Opens import dialog
+- [ ] `Cmd/Ctrl+E` → Opens export dialog (if clips loaded)
+- [ ] `Cmd/Ctrl+Q` → Shows quit warning if temp files exist
+
+#### 19.2 Editing Shortcuts (Phase 2)
+
+- [ ] `Cmd+K` → Splits clip at playhead
+- [ ] `Cmd+K` at clip boundary → No action (too close)
+- [ ] `Cmd+K` with no clip → No action
+
+#### 19.3 Recording Shortcuts (Phase 2)
+
+- [ ] `Cmd+Shift+S` during screen recording → Stops recording
+- [ ] `Esc` during recording countdown → Cancels recording
+- [ ] Shortcuts work even when app minimized (screen recording)
+
+---
+
+### 20. Multi-Platform Tests (if applicable)
 
 #### 12.1 macOS
 

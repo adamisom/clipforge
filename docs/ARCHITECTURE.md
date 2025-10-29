@@ -2,7 +2,15 @@
 
 ## Overview
 
-ClipForge is a desktop video editor built with Electron and React. This document describes the high-level architecture, data flow, and key design decisions for the MVP implementation.
+ClipForge is a desktop video editor built with Electron and React. This document describes the high-level architecture, data flow, and key design decisions for the MVP and Phase 2 implementation.
+
+**Current Status**: MVP + Phase 2 Complete
+- ✅ Basic video editing (import, trim, export)
+- ✅ Multi-clip timeline support
+- ✅ Screen and webcam recording
+- ✅ Split functionality
+- ✅ Drag-and-drop import
+- ✅ Temp file management
 
 ---
 
@@ -14,12 +22,14 @@ ClipForge follows Electron's standard three-process architecture:
 
 1. **Main Process** (`src/main/index.ts`)
    - Node.js process with full system access
-   - Handles file I/O, FFmpeg operations, window management
+   - Handles file I/O, FFmpeg operations, window management, recording controls
+   - Manages temp file cleanup and app quit warnings
    - Entry point: `electron .`
 
 2. **Renderer Process** (`src/renderer/`)
    - React application running in Chromium
-   - Handles UI, user interactions, visual feedback
+   - Handles UI, user interactions, visual feedback, recording UI
+   - Multi-clip state management with `clips[]` array
    - Has NO direct Node.js access (security)
 
 3. **Preload Script** (`src/preload/index.ts`)
@@ -47,7 +57,7 @@ webPreferences: {
 ### Import Workflow
 
 ```
-User clicks Import
+User clicks Import (or drags file)
     ↓
 Renderer: calls window.api.selectVideoFile()
     ↓
@@ -63,14 +73,91 @@ Main: Runs ffprobe to extract metadata
     ↓
 Main: Returns { duration, width, height, codec, filename }
     ↓
-Renderer: Updates videoState
+Renderer: Creates TimelineClip, adds to clips[] array
 ```
 
 **Key Points**:
 
 - All file operations happen in main process
 - Metadata extraction (ffprobe) returns filename to avoid using `path` module in renderer
-- State update triggers re-render showing VideoEditor
+- Each clip gets unique ID and is added to clips array
+- Drag-and-drop uses same metadata extraction flow
+
+### Recording Workflow (Screen/Webcam)
+
+```
+User clicks "Test Screen" or "Test Webcam"
+    ↓
+Renderer: Shows ScreenRecorder or WebcamRecorder component
+    ↓
+[Screen Only] Renderer: Fetches available sources via window.api.getScreenSources()
+    ↓
+[Screen Only] Main: Uses desktopCapturer API, returns source list with thumbnails
+    ↓
+[Screen Only] User selects source → Countdown → Window minimizes (if not recording self)
+    ↓
+Renderer: Uses getUserMedia() to capture MediaStream
+    ↓
+Renderer: MediaRecorder records to Blob
+    ↓
+[Screen Only] Main: Shows notification + registers Cmd+Shift+S shortcut
+    ↓
+User stops recording (button or shortcut)
+    ↓
+Renderer: Converts Blob to ArrayBuffer, calls window.api.saveRecordingBlob()
+    ↓
+Main: Writes to temp directory (/tmp/clipforge-recording-YYYY-MM-DD-HH-MM-SS.webm)
+    ↓
+Main: Returns temp path
+    ↓
+Renderer: Prompts user to save permanently via window.api.saveRecordingPermanent()
+    ↓
+Main: Shows save dialog, copies temp file to chosen location
+    ↓
+Renderer: Gets metadata, creates TimelineClip with temp or permanent path
+    ↓
+Renderer: Adds to clips[] array, displays ⚠️ if still temp
+```
+
+**Key Points**:
+
+- Recording happens in renderer (MediaRecorder API)
+- File writing happens in main process
+- Temp files get orange border + ⚠️ indicator on timeline
+- Screen recording uses notification + global shortcut for better UX
+- Window minimize logic skips if recording ClipForge/Electron itself
+
+### Multi-Clip Export Workflow
+
+```
+User clicks Export (with multiple clips)
+    ↓
+Renderer: Checks clips.length
+    ↓
+If single clip: window.api.exportVideo() (simple trim)
+If multiple clips: window.api.exportMultiClip(clips, outputPath)
+    ↓
+Main: Detects if any clips have trimming
+    ↓
+[No Trimming] FFmpeg concat demuxer with -c copy (fast)
+[With Trimming] FFmpeg complex filter: trim each + concat (re-encode)
+    ↓
+Main: Creates temp concat list file if needed
+    ↓
+Main: Executes FFmpeg, sends progress via webContents.send()
+    ↓
+Renderer: Updates UI with progress
+    ↓
+Main: Cleans up temp files, sends completion event
+    ↓
+Renderer: Shows success message
+```
+
+**Key Points**:
+
+- Export automatically chooses optimal method based on trimming
+- Simple concat is much faster (no re-encoding) when no trimming
+- Complex filter handles per-clip trimming + concatenation in one pass
 
 ### Export Workflow
 
@@ -101,6 +188,60 @@ Renderer: Shows success message
 - Export runs in main process (doesn't block renderer)
 - Progress communication uses `webContents.send()`, not IPC return values
 - User can't interact with timeline during export (UI disabled)
+
+### Multi-Clip Playback Workflow
+
+```
+User clicks Play (with multiple clips on timeline)
+    ↓
+Renderer: Calculates which clip playhead is currently in
+    ↓
+Renderer: Passes currentClip + relativePlayheadPosition to VideoPreview
+    ↓
+VideoPreview: Plays from currentClip.sourceStartTime + relativePosition
+    ↓
+Video fires onTimeUpdate events
+    ↓
+Renderer: Updates absolute playheadPosition
+    ↓
+When clip ends: Renderer checks for next clip
+    ↓
+If next clip exists: Advance playhead to next clip's start
+If no next clip: Stop playback at timeline end
+    ↓
+VideoPreview: Re-mounts with new clip source (key={currentClip.id})
+    ↓
+Timeline: Re-renders playhead position
+```
+
+**Key Constraints**:
+
+- Playhead represents absolute position across all clips
+- VideoPreview shows relative position within current clip
+- Seamless transitions between clips via key prop forcing re-mount
+- Auto-advance stops at timeline end
+
+### Split Workflow
+
+```
+User positions playhead mid-clip, presses Cmd+K
+    ↓
+Renderer: Calculates split point relative to source video
+    ↓
+Renderer: Creates two new TimelineClip objects:
+  - First: sourceStartTime unchanged, duration = playhead position
+  - Second: sourceStartTime = splitPoint, duration = remaining time
+    ↓
+Renderer: Replaces original clip in clips[] array
+    ↓
+Timeline: Re-renders showing two clips with boundary
+```
+
+**Key Points**:
+
+- Split doesn't modify source file, only clip metadata
+- Both resulting clips reference the same source file
+- Each clip gets unique ID for independent trimming
 
 ### Playback Workflow
 
