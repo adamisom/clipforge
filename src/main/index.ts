@@ -150,6 +150,7 @@ function updateTrayMenu(recordingDuration?: string): void {
   if (!tray) return
 
   const menuTemplate: Electron.MenuItemConstructorOptions[] = []
+  const mainWindow = BrowserWindow.getAllWindows()[0]
 
   if (isRecording) {
     menuTemplate.push(

@@ -4,9 +4,15 @@ interface InfoPanelProps {
   currentClip: TimelineClip | undefined
   totalClips: number
   onExport: () => Promise<void>
+  onDeleteClip: () => void
 }
 
-function InfoPanel({ currentClip, totalClips, onExport }: InfoPanelProps): React.JSX.Element {
+function InfoPanel({
+  currentClip,
+  totalClips,
+  onExport,
+  onDeleteClip
+}: InfoPanelProps): React.JSX.Element {
   return (
     <div className="info-panel">
       <div className="info-content">
@@ -33,24 +39,44 @@ function InfoPanel({ currentClip, totalClips, onExport }: InfoPanelProps): React
         )}
       </div>
 
-      <button
-        onClick={onExport}
-        disabled={totalClips === 0}
-        className="export-button"
-        style={{
-          marginTop: '20px',
-          padding: '12px 24px',
-          background: totalClips === 0 ? '#666' : '#646cff',
-          color: 'white',
-          border: 'none',
-          borderRadius: '8px',
-          cursor: totalClips === 0 ? 'not-allowed' : 'pointer',
-          fontSize: '16px',
-          fontWeight: 'bold'
-        }}
-      >
-        Export Video
-      </button>
+      <div className="button-group">
+        <button
+          onClick={onDeleteClip}
+          disabled={!currentClip}
+          className="delete-button"
+          style={{
+            padding: '10px 20px',
+            background: !currentClip ? '#666' : '#ff4444',
+            color: 'white',
+            border: 'none',
+            borderRadius: '8px',
+            cursor: !currentClip ? 'not-allowed' : 'pointer',
+            fontSize: '14px',
+            marginBottom: '12px'
+          }}
+          title="Delete selected clip (Delete key)"
+        >
+          Delete Clip
+        </button>
+
+        <button
+          onClick={onExport}
+          disabled={totalClips === 0}
+          className="export-button"
+          style={{
+            padding: '12px 24px',
+            background: totalClips === 0 ? '#666' : '#646cff',
+            color: 'white',
+            border: 'none',
+            borderRadius: '8px',
+            cursor: totalClips === 0 ? 'not-allowed' : 'pointer',
+            fontSize: '16px',
+            fontWeight: 'bold'
+          }}
+        >
+          Export Video
+        </button>
+      </div>
     </div>
   )
 }

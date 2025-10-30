@@ -123,12 +123,65 @@ function VideoEditor({
     })
   }, [currentClip, clips, playheadPosition, setClips])
 
-  // Listen for Cmd+K keyboard shortcut for split
+  const handleDeleteClip = useCallback((): void => {
+    if (!selectedClipId) return
+
+    // Confirm deletion
+    const clipToDelete = clips.find((c) => c.id === selectedClipId)
+    if (!clipToDelete) return
+
+    const confirmed = window.confirm(
+      `Delete "${clipToDelete.metadata.filename}"?\n\nThis cannot be undone.`
+    )
+    if (!confirmed) return
+
+    // Pause playback if playing
+    if (isPlaying) {
+      pause()
+    }
+
+    // Find adjacent clip to select
+    const index = clips.findIndex((c) => c.id === selectedClipId)
+    const nextClip = clips[index + 1] || clips[index - 1] || null
+
+    // Delete clip
+    setClips((prevClips) => prevClips.filter((c) => c.id !== selectedClipId))
+
+    // Update selection
+    setSelectedClipId(nextClip?.id || null)
+
+    // Reset playhead to start if needed
+    const newTotalDuration = clips
+      .filter((c) => c.id !== selectedClipId)
+      .reduce((sum, c) => sum + c.timelineDuration, 0)
+
+    if (playheadPosition > newTotalDuration) {
+      handlePlayheadChange(0)
+    }
+  }, [
+    selectedClipId,
+    clips,
+    isPlaying,
+    pause,
+    setClips,
+    setSelectedClipId,
+    playheadPosition,
+    handlePlayheadChange
+  ])
+
+  // Listen for Cmd+K keyboard shortcut for split and Delete/Backspace for delete
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent): void => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault()
         handleSplitAtPlayhead()
+      } else if (e.key === 'Delete' || e.key === 'Backspace') {
+        // Only delete if not typing in an input
+        if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+          return
+        }
+        e.preventDefault()
+        handleDeleteClip()
       }
     }
 
@@ -137,7 +190,7 @@ function VideoEditor({
     return () => {
       window.removeEventListener('keydown', handleKeyDown)
     }
-  }, [handleSplitAtPlayhead])
+  }, [handleSplitAtPlayhead, handleDeleteClip])
 
   const handleExport = useCallback(async (): Promise<void> => {
     if (clips.length === 0) return
@@ -206,7 +259,12 @@ function VideoEditor({
         onRecordWebcam={onRecordWebcam}
       />
 
-      <InfoPanel currentClip={currentClip} totalClips={clips.length} onExport={handleExport} />
+      <InfoPanel
+        currentClip={currentClip}
+        totalClips={clips.length}
+        onExport={handleExport}
+        onDeleteClip={handleDeleteClip}
+      />
     </div>
   )
 }
