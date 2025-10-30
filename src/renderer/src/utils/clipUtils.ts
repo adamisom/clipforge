@@ -25,8 +25,8 @@ export const calculateClipPositions = (
 /**
  * Check if a file path is a temporary recording
  */
-export const isTempFile = (sourcePath: string): boolean => {
-  return sourcePath.includes('/clipforge-recording-')
+export const isTempFile = async (sourcePath: string): Promise<boolean> => {
+  return await window.api.isTempFile(sourcePath)
 }
 
 /**

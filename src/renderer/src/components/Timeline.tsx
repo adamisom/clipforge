@@ -34,7 +34,21 @@ function Timeline({
   const [isDraggingPlayhead, setIsDraggingPlayhead] = useState(false)
   const [dragType, setDragType] = useState<'start' | 'end' | null>(null)
   const [dragClipId, setDragClipId] = useState<string | null>(null)
+  const [tempFileFlags, setTempFileFlags] = useState<Map<string, boolean>>(new Map())
   const timelineRef = useRef<HTMLDivElement>(null)
+
+  // Check which clips are temp files
+  useEffect(() => {
+    const checkTempFiles = async (): Promise<void> => {
+      const flags = new Map<string, boolean>()
+      for (const clip of clips) {
+        const isTemp = await isTempFile(clip.sourcePath)
+        flags.set(clip.id, isTemp)
+      }
+      setTempFileFlags(flags)
+    }
+    checkTempFiles()
+  }, [clips])
 
   // Calculate total duration and clip positions
   const totalDuration = clips.reduce((sum, clip) => sum + clip.timelineDuration, 0)
@@ -152,7 +166,7 @@ function Timeline({
       window.removeEventListener('mousemove', handleMouseMove)
       window.removeEventListener('mouseup', handleMouseUp)
     }
-  }, [isDraggingPlayhead, totalDuration, pixelsPerSecond, onPlayheadChange])
+  }, [isDraggingPlayhead, totalDuration, pixelsPerSecond, onPlayheadChange, onPlayheadDragEnd])
 
   return (
     <div className="timeline-panel">
@@ -211,7 +225,7 @@ function Timeline({
               const clipPositionData = clipPositions.get(clip.id)
               const clipStart = clipPositionData?.start || 0
               const isSelected = clip.id === selectedClipId
-              const isTemp = isTempFile(clip.sourcePath)
+              const isTemp = tempFileFlags.get(clip.id) || false
 
               return (
                 <div

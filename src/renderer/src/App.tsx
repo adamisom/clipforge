@@ -77,8 +77,9 @@ function App(): React.JSX.Element {
 
   // Listen for quit check - respond with whether we have temp files
   useEffect(() => {
-    const handleCheckUnsavedRecordings = (): void => {
-      const hasTempFiles = clips.some((clip) => isTempFile(clip.sourcePath))
+    const handleCheckUnsavedRecordings = async (): Promise<void> => {
+      const tempFileChecks = await Promise.all(clips.map((clip) => isTempFile(clip.sourcePath)))
+      const hasTempFiles = tempFileChecks.some((isTemp) => isTemp)
       window.api.respondUnsavedRecordings(hasTempFiles)
     }
 

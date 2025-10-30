@@ -22,6 +22,7 @@ const api = {
   startRecordingNoMinimize: () => ipcRenderer.invoke('start-recording-no-minimize'),
   stopRecording: () => ipcRenderer.invoke('stop-recording'),
   onStopRecording: (callback) => ipcRenderer.on('stop-recording', callback),
+  isTempFile: (filePath: string) => ipcRenderer.invoke('is-temp-file', filePath),
 
   // Event listeners (one-way events)
   onExportProgress: (callback: (event: IpcRendererEvent, progress: { percent: number }) => void) =>

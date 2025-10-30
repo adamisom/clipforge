@@ -55,7 +55,7 @@ export function getTempRecordingPath(): string {
 }
 
 export function isTempFile(filePath: string): boolean {
-  return filePath.includes('clipforge-recordings')
+  return filePath.startsWith(TEMP_DIR)
 }
 
 export async function initializeOnAppStart(referencedFiles: string[]): Promise<void> {

@@ -38,6 +38,7 @@ declare global {
       startRecordingNoMinimize: () => Promise<void>
       stopRecording: () => Promise<void>
       onStopRecording: (callback: () => void) => void
+      isTempFile: (filePath: string) => Promise<boolean>
 
       // Event listeners (one-way events)
       onExportProgress: (

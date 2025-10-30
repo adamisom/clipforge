@@ -21,7 +21,8 @@ import fs from 'fs'
 import {
   initializeOnAppStart,
   getTempRecordingPath,
-  checkTempDirSize
+  checkTempDirSize,
+  isTempFile
 } from './utils/tempFileManager'
 
 // Set up FFmpeg and FFprobe binary paths (dev vs production)
@@ -343,6 +344,11 @@ app.whenReady().then(async () => {
       })
     }
   )
+
+  // Check if a file path is in the temp directory
+  ipcMain.handle('is-temp-file', (_event, filePath: string) => {
+    return isTempFile(filePath)
+  })
 
   // Save recording blob to temp
   ipcMain.handle('save-recording-blob', async (_event, arrayBuffer: ArrayBuffer) => {
