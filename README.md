@@ -33,6 +33,14 @@ $ npm run build:mac
 $ npm run build:linux
 ```
 
+## Known Behavior
+
+### Video Preview Seeking
+
+When playing across split clips, pausing/resuming, or seeking to a new position, you may notice the video preview briefly "rewinds" by a fraction of a second. This is **normal behavior** caused by how browsers seek to the nearest keyframe in video files.
+
+**Important:** This visual artifact **only affects the preview** and **does not affect exported videos**. FFmpeg performs frame-accurate seeking during export, ensuring your final output is precisely trimmed and split as intended.
+
 ## Troubleshooting
 
 ### Zoom Reset

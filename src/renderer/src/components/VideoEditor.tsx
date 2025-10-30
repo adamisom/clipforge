@@ -237,7 +237,7 @@ function VideoEditor({
       <div className="preview-panel">
         {currentClip ? (
           <VideoPreview
-            key={currentClip.id}
+            key={currentClip.sourcePath}
             sourcePath={currentClip.sourcePath}
             trimStart={currentClip.sourceStartTime}
             trimEnd={currentClip.sourceStartTime + currentClip.timelineDuration}
