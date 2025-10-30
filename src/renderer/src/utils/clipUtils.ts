@@ -68,6 +68,19 @@ export const getTotalDuration = (clips: TimelineClip[]): number => {
   return clips.reduce((sum, clip) => sum + clip.timelineDuration, 0)
 }
 
+// Track filtering utilities
+export const getTrackClips = (clips: TimelineClip[], trackIndex: 0 | 1): TimelineClip[] => {
+  return clips.filter((c) => c.trackIndex === trackIndex)
+}
+
+export const getTrack0Clips = (clips: TimelineClip[]): TimelineClip[] => {
+  return getTrackClips(clips, 0)
+}
+
+export const getTrack1Clips = (clips: TimelineClip[]): TimelineClip[] => {
+  return getTrackClips(clips, 1)
+}
+
 /**
  * Create a timeline clip from metadata
  */

@@ -4,7 +4,8 @@ import {
   calculateClipPositions,
   getCurrentClip,
   getRelativePlayheadPosition,
-  getTotalDuration
+  getTotalDuration,
+  getTrack0Clips
 } from '../utils/clipUtils'
 
 interface UseMultiClipPlaybackReturn {
@@ -28,7 +29,7 @@ export const useMultiClipPlayback = (clips: TimelineClip[]): UseMultiClipPlaybac
   const [isPlaying, setIsPlaying] = useState(false)
 
   // CRITICAL: Only use Track 0 clips for playback (Track 1 is overlay metadata for export)
-  const track0Clips = clips.filter((c) => c.trackIndex === 0)
+  const track0Clips = getTrack0Clips(clips)
 
   const totalDuration = getTotalDuration(track0Clips)
 

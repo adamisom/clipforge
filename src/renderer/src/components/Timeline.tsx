@@ -1,6 +1,11 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { formatTime } from '../utils/videoUtils'
-import { calculateClipPositions, isTempFile } from '../utils/clipUtils'
+import {
+  calculateClipPositions,
+  isTempFile,
+  getTrack0Clips,
+  getTrack1Clips
+} from '../utils/clipUtils'
 import { TimelineClip } from '../types/timeline'
 
 interface TimelineProps {
@@ -59,8 +64,8 @@ function Timeline({
   }, [clips])
 
   // Calculate total duration and clip positions (per track for correct positioning)
-  const track0Clips = clips.filter((c) => c.trackIndex === 0)
-  const track1Clips = clips.filter((c) => c.trackIndex === 1)
+  const track0Clips = getTrack0Clips(clips)
+  const track1Clips = getTrack1Clips(clips)
 
   const track0Positions = useMemo(() => calculateClipPositions(track0Clips), [track0Clips])
   const track1Positions = useMemo(() => calculateClipPositions(track1Clips), [track1Clips])
