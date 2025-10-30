@@ -7,7 +7,9 @@ import {
   Menu,
   desktopCapturer,
   Notification,
-  globalShortcut
+  globalShortcut,
+  Tray,
+  nativeImage
 } from 'electron'
 import { join } from 'path'
 import path from 'path'
@@ -47,6 +49,9 @@ if (!fs.existsSync(ffprobePath)) {
 let isRecording = false
 let recordingNotification: Notification | null = null
 let quitting = false
+let tray: Tray | null = null
+let recordingStartTime: number | null = null
+let recordingTimerInterval: NodeJS.Timeout | null = null
 
 function createWindow(): void {
   // Create the browser window.
@@ -140,6 +145,79 @@ app.on('before-quit', async (e) => {
   }
 })
 
+// Tray management functions
+function updateTrayMenu(recordingDuration?: string): void {
+  if (!tray) return
+
+  const menuTemplate: Electron.MenuItemConstructorOptions[] = []
+
+  if (isRecording) {
+    menuTemplate.push(
+      {
+        label: recordingDuration ? `🔴REC ${recordingDuration}` : '🔴REC',
+        enabled: false
+      },
+      { type: 'separator' },
+      {
+        label: 'Stop Recording',
+        click: () => {
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('stop-recording')
+          }
+        }
+      },
+      { type: 'separator' }
+    )
+  }
+
+  menuTemplate.push(
+    {
+      label: 'Show ClipForge',
+      click: () => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.show()
+          mainWindow.focus()
+        }
+      }
+    },
+    { type: 'separator' },
+    {
+      label: 'Quit',
+      click: () => app.quit()
+    }
+  )
+
+  tray.setContextMenu(Menu.buildFromTemplate(menuTemplate))
+}
+
+function startRecordingTimer(): void {
+  recordingStartTime = Date.now()
+
+  // Update tray title and menu every second with elapsed time
+  recordingTimerInterval = setInterval(() => {
+    if (!recordingStartTime || !tray) return
+
+    const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000)
+    const minutes = Math.floor(elapsed / 60)
+    const seconds = elapsed % 60
+    const timeStr = `${minutes}:${seconds.toString().padStart(2, '0')}`
+
+    tray.setTitle(`🔴REC`)
+    updateTrayMenu(timeStr)
+  }, 1000)
+}
+
+function stopRecordingTimer(): void {
+  if (recordingTimerInterval) {
+    clearInterval(recordingTimerInterval)
+    recordingTimerInterval = null
+  }
+  if (tray) {
+    tray.setTitle('')
+  }
+  recordingStartTime = null
+}
+
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
@@ -155,6 +233,12 @@ app.whenReady().then(async () => {
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
   })
+
+  // Create tray icon (use a transparent 1x1 image as the icon, rely on title for display)
+  const emptyImage = nativeImage.createEmpty()
+  tray = new Tray(emptyImage)
+  tray.setToolTip('ClipForge')
+  updateTrayMenu()
 
   // IPC Handlers for video operations
 
@@ -418,6 +502,9 @@ app.whenReady().then(async () => {
 
     isRecording = true
 
+    // Start tray recording timer
+    startRecordingTimer()
+
     // Unregister any existing shortcut first (in case of quick re-recording)
     globalShortcut.unregister('CommandOrControl+Shift+S')
 
@@ -464,6 +551,9 @@ app.whenReady().then(async () => {
 
     isRecording = true
 
+    // Start tray recording timer
+    startRecordingTimer()
+
     // Unregister any existing shortcut first (in case of quick re-recording)
     globalShortcut.unregister('CommandOrControl+Shift+S')
 
@@ -507,6 +597,10 @@ app.whenReady().then(async () => {
   // Stop recording - cleanup
   ipcMain.handle('stop-recording', () => {
     isRecording = false
+
+    // Stop tray recording timer
+    stopRecordingTimer()
+    updateTrayMenu()
 
     // Unregister shortcut
     globalShortcut.unregister('CommandOrControl+Shift+S')
