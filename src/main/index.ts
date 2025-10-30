@@ -674,16 +674,22 @@ app.whenReady().then(async () => {
       console.log('[main] Getting screen sources...')
       const sources = await desktopCapturer.getSources({
         types: ['screen', 'window'],
-        thumbnailSize: { width: 300, height: 200 }
+        thumbnailSize: { width: 150, height: 100 } // Reduced size to avoid IPC limits
       })
 
       console.log(`[main] Found ${sources.length} sources`)
 
-      return sources.map((source) => ({
-        id: source.id,
-        name: source.name,
-        thumbnail: source.thumbnail.toDataURL()
-      }))
+      return sources.map((source) => {
+        // Convert to smaller JPEG format and resize to reduce IPC payload
+        const thumbnail = source.thumbnail.resize({ width: 150, height: 100 })
+        const dataUrl = thumbnail.toJPEG(60) // 60% quality JPEG
+
+        return {
+          id: source.id,
+          name: source.name,
+          thumbnail: `data:image/jpeg;base64,${dataUrl.toString('base64')}`
+        }
+      })
     } catch (err) {
       console.error('[main] Error getting screen sources:', err)
       throw err
