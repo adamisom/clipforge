@@ -670,16 +670,24 @@ app.whenReady().then(async () => {
 
   // Get screen sources for recording
   ipcMain.handle('get-screen-sources', async () => {
-    const sources = await desktopCapturer.getSources({
-      types: ['screen', 'window'],
-      thumbnailSize: { width: 300, height: 200 }
-    })
+    try {
+      console.log('[main] Getting screen sources...')
+      const sources = await desktopCapturer.getSources({
+        types: ['screen', 'window'],
+        thumbnailSize: { width: 300, height: 200 }
+      })
 
-    return sources.map((source) => ({
-      id: source.id,
-      name: source.name,
-      thumbnail: source.thumbnail.toDataURL()
-    }))
+      console.log(`[main] Found ${sources.length} sources`)
+
+      return sources.map((source) => ({
+        id: source.id,
+        name: source.name,
+        thumbnail: source.thumbnail.toDataURL()
+      }))
+    } catch (err) {
+      console.error('[main] Error getting screen sources:', err)
+      throw err
+    }
   })
 
   // Start recording - minimize window, show notification, register shortcut
