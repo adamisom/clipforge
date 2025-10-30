@@ -8,7 +8,6 @@ interface InfoPanelProps {
   pipConfig: PiPConfig
   onPipConfigChange: (config: PiPConfig) => void
   onExport: () => Promise<void>
-  onDeleteClip: () => void
   onSavePermanently: () => Promise<void>
 }
 
@@ -18,7 +17,6 @@ function InfoPanel({
   pipConfig,
   onPipConfigChange,
   onExport,
-  onDeleteClip,
   onSavePermanently
 }: InfoPanelProps): React.JSX.Element {
   const [isTemp, setIsTemp] = useState(false)
@@ -37,7 +35,8 @@ function InfoPanel({
   return (
     <div className="info-panel">
       <div className="info-content">
-        <h3>Video Info</h3>
+        {/* Video Info Section - Compressed */}
+        <h3 style={{ marginBottom: '8px' }}>Video Info</h3>
         <div className="info-item">
           <strong>Clips:</strong> {totalClips}
         </div>
@@ -62,9 +61,55 @@ function InfoPanel({
           </>
         )}
 
+        {/* Save Permanently button (if temp file) */}
+        {isTemp && currentClip && (
+          <button
+            onClick={onSavePermanently}
+            className="save-permanent-button"
+            style={{
+              padding: '8px 16px',
+              background: '#ffa500',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              marginTop: '12px',
+              width: '100%',
+              fontWeight: 'bold'
+            }}
+            title="Save this temporary recording permanently"
+          >
+            💾 Save Permanently
+          </button>
+        )}
+
+        {/* Export Button with horizontal lines */}
         <hr style={{ margin: '16px 0', border: '1px solid #444' }} />
 
-        <h3>PiP Settings</h3>
+        <button
+          onClick={onExport}
+          disabled={totalClips === 0}
+          className="export-button"
+          style={{
+            padding: '12px 24px',
+            background: totalClips === 0 ? '#666' : '#646cff',
+            color: 'white',
+            border: 'none',
+            borderRadius: '8px',
+            cursor: totalClips === 0 ? 'not-allowed' : 'pointer',
+            fontSize: '16px',
+            fontWeight: 'bold',
+            width: '100%'
+          }}
+        >
+          Export Video
+        </button>
+
+        <hr style={{ margin: '16px 0', border: '1px solid #444' }} />
+
+        {/* PiP Settings Section */}
+        <h3 style={{ marginBottom: '8px' }}>PiP Settings</h3>
         <div className="info-item">
           <label>
             <strong>Position:</strong>
@@ -98,66 +143,6 @@ function InfoPanel({
             <option value="large">Large (40%)</option>
           </select>
         </div>
-      </div>
-
-      <div className="button-group">
-        {isTemp && currentClip && (
-          <button
-            onClick={onSavePermanently}
-            className="save-permanent-button"
-            style={{
-              padding: '10px 20px',
-              background: '#ffa500',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              fontSize: '14px',
-              marginBottom: '12px',
-              fontWeight: 'bold'
-            }}
-            title="Save this temporary recording permanently"
-          >
-            💾 Save Permanently
-          </button>
-        )}
-
-        <button
-          onClick={onDeleteClip}
-          disabled={!currentClip}
-          className="delete-button"
-          style={{
-            padding: '10px 20px',
-            background: !currentClip ? '#666' : '#ff4444',
-            color: 'white',
-            border: 'none',
-            borderRadius: '8px',
-            cursor: !currentClip ? 'not-allowed' : 'pointer',
-            fontSize: '14px',
-            marginBottom: '12px'
-          }}
-          title="Delete selected clip (Delete key)"
-        >
-          Delete Clip
-        </button>
-
-        <button
-          onClick={onExport}
-          disabled={totalClips === 0}
-          className="export-button"
-          style={{
-            padding: '12px 24px',
-            background: totalClips === 0 ? '#666' : '#646cff',
-            color: 'white',
-            border: 'none',
-            borderRadius: '8px',
-            cursor: totalClips === 0 ? 'not-allowed' : 'pointer',
-            fontSize: '16px',
-            fontWeight: 'bold'
-          }}
-        >
-          Export Video
-        </button>
       </div>
     </div>
   )

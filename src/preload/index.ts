@@ -1,8 +1,11 @@
-import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron'
+import { contextBridge, ipcRenderer, IpcRendererEvent, webUtils } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 
 // Custom APIs for renderer
 const api = {
+  // File utilities
+  getPathForFile: (file: File) => webUtils.getPathForFile(file),
+
   // Invoke methods (request-response)
   selectVideoFile: () => ipcRenderer.invoke('select-video-file'),
   resizeWindow: (width: number, height: number) =>

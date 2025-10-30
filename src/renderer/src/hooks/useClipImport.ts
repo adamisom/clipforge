@@ -29,16 +29,23 @@ export const useClipImport = (onClipAdded: (clip: TimelineClip) => void): UseCli
     async (files: FileList): Promise<void> => {
       const videoFiles = Array.from(files).filter((file) => {
         const ext = file.name.toLowerCase().split('.').pop()
-        return ['mp4', 'mov'].includes(ext || '')
+        return ['mp4', 'mov', 'webm'].includes(ext || '')
       })
 
       if (videoFiles.length === 0) {
-        alert('Please drop a video file (MP4 or MOV)')
+        alert('Please drop a video file (MP4, MOV, or WEBM)')
         return
       }
 
-      const filePath = (videoFiles[0] as File & { path: string }).path
-      if (!filePath) return
+      const file = videoFiles[0] as File & { path: string }
+
+      // Use Electron's webUtils.getPathForFile to get the actual file path
+      const filePath = window.api.getPathForFile(file)
+
+      if (!filePath) {
+        console.error('[useClipImport] No file path found!')
+        return
+      }
 
       try {
         const metadata = await window.api.getVideoMetadata(filePath)

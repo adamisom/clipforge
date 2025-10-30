@@ -9,7 +9,6 @@ interface VideoPreviewProps {
   isPlaying: boolean
   pipClip: TimelineClip | null // NEW: PiP overlay clip
   pipConfig: PiPConfig // NEW: PiP position/size
-  onPlayPause: () => void
   onTimeUpdate: (time: number) => void
 }
 
@@ -21,7 +20,6 @@ function VideoPreview({
   isPlaying,
   pipClip,
   pipConfig,
-  onPlayPause,
   onTimeUpdate
 }: VideoPreviewProps): React.JSX.Element {
   const mainVideoRef = useRef<HTMLVideoElement>(null) // Renamed from videoRef
@@ -159,10 +157,6 @@ function VideoPreview({
               style={getPipStyle()}
             />
           )}
-
-          <div className="video-controls">
-            <button onClick={onPlayPause}>{isPlaying ? '⏸' : '▶'}</button>
-          </div>
         </>
       ) : (
         <div className="preview-placeholder">No video loaded</div>

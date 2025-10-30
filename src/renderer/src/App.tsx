@@ -37,8 +37,11 @@ function App(): React.JSX.Element {
   }
 
   const handleDragLeave = (e: React.DragEvent): void => {
-    e.preventDefault()
-    setIsDragging(false)
+    // Only set isDragging to false if we're actually leaving the App container
+    // (not just entering a child element like the drop zone)
+    if (e.currentTarget === e.target) {
+      setIsDragging(false)
+    }
   }
 
   const handleDropEvent = async (e: React.DragEvent): Promise<void> => {

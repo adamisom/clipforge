@@ -171,7 +171,6 @@ function VideoEditor({
             isPlaying={isPlaying}
             pipClip={currentPipClip}
             pipConfig={pipConfig}
-            onPlayPause={togglePlayPause}
             onTimeUpdate={handleTimeUpdate}
           />
         ) : null}
@@ -191,6 +190,10 @@ function VideoEditor({
         onRecordScreen={onRecordScreen}
         onRecordWebcam={onRecordWebcam}
         onMoveToTrack={handleMoveToTrack}
+        isPlaying={isPlaying}
+        onPlayPause={togglePlayPause}
+        onDeleteClip={handleDeleteClip}
+        currentClip={currentClip}
       />
 
       <InfoPanel
@@ -199,7 +202,6 @@ function VideoEditor({
         pipConfig={pipConfig}
         onPipConfigChange={setPipConfig}
         onExport={handleExport}
-        onDeleteClip={handleDeleteClip}
         onSavePermanently={handleSavePermanently}
       />
     </div>

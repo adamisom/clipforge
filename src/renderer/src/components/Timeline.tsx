@@ -20,7 +20,11 @@ interface TimelineProps {
   onImport: () => void
   onRecordScreen: () => void
   onRecordWebcam: () => void
-  onMoveToTrack: (clipId: string, trackIndex: 0 | 1) => void // NEW
+  onMoveToTrack: (clipId: string, trackIndex: 0 | 1) => void
+  isPlaying: boolean
+  onPlayPause: () => void
+  onDeleteClip: () => void
+  currentClip: TimelineClip | undefined
 }
 
 function Timeline({
@@ -35,7 +39,11 @@ function Timeline({
   onImport,
   onRecordScreen,
   onRecordWebcam,
-  onMoveToTrack
+  onMoveToTrack,
+  isPlaying,
+  onPlayPause,
+  onDeleteClip,
+  currentClip
 }: TimelineProps): React.JSX.Element {
   const [isDraggingTrim, setIsDraggingTrim] = useState(false)
   const [isDraggingPlayhead, setIsDraggingPlayhead] = useState(false)
@@ -238,23 +246,48 @@ function Timeline({
     <div className="timeline-panel">
       {/* Timeline Toolbar */}
       <div className="timeline-toolbar">
-        <button onClick={onImport} className="timeline-toolbar-button" title="Import Video (Cmd+I)">
-          + Import
-        </button>
-        <button
-          onClick={onRecordScreen}
-          className="timeline-toolbar-button"
-          title="Record Screen (Cmd+Shift+R)"
-        >
-          🖥️
-        </button>
-        <button
-          onClick={onRecordWebcam}
-          className="timeline-toolbar-button"
-          title="Record Webcam (Cmd+Shift+W)"
-        >
-          📹
-        </button>
+        <div className="timeline-toolbar-left">
+          <button
+            onClick={onImport}
+            className="timeline-toolbar-button"
+            title="Import Video (Cmd+I)"
+          >
+            + Import
+          </button>
+          <button
+            onClick={onRecordScreen}
+            className="timeline-toolbar-button"
+            title="Record Screen (Cmd+Shift+R)"
+          >
+            🖥️
+          </button>
+          <button
+            onClick={onRecordWebcam}
+            className="timeline-toolbar-button"
+            title="Record Webcam (Cmd+Shift+W)"
+          >
+            📹
+          </button>
+        </div>
+
+        {/* Play/Pause Button - Center, Prominent */}
+        <div className="timeline-toolbar-center">
+          <button onClick={onPlayPause} className="timeline-play-button" title="Play/Pause (Space)">
+            {isPlaying ? '⏸' : '▶'}
+          </button>
+        </div>
+
+        {/* Delete Button - Right */}
+        <div className="timeline-toolbar-right">
+          <button
+            onClick={onDeleteClip}
+            disabled={!currentClip}
+            className="timeline-delete-button"
+            title="Delete selected clip (Delete key)"
+          >
+            🗑️ Delete
+          </button>
+        </div>
       </div>
 
       {/* Timeline Content Wrapper */}

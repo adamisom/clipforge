@@ -181,11 +181,25 @@ body {
 
 .timeline-toolbar {
   display: flex;
-  gap: 8px;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
   padding: 8px 12px;
   background: #2a2a2a;
   border-bottom: 1px solid #333;
   flex-shrink: 0;
+}
+
+.timeline-toolbar-left,
+.timeline-toolbar-right {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.timeline-toolbar-center {
+  display: flex;
+  align-items: center;
 }
 
 .timeline-toolbar-button {
@@ -204,6 +218,57 @@ body {
 
 .timeline-toolbar-button:hover {
   background: #3a8eef;
+}
+
+/* Play/Pause Button - Prominent, Centered */
+.timeline-play-button {
+  padding: 12px 24px;
+  font-size: 24px;
+  background: #646cff;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 32px;
+  min-width: 80px;
+}
+
+.timeline-play-button:hover {
+  background: #535bf2;
+  transform: scale(1.05);
+}
+
+.timeline-play-button:active {
+  transform: scale(0.98);
+}
+
+/* Delete Button - Right Side */
+.timeline-delete-button {
+  padding: 6px 14px;
+  font-size: 14px;
+  background: #ff4444;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.timeline-delete-button:hover {
+  background: #ff3333;
+}
+
+.timeline-delete-button:disabled {
+  background: #666;
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .timeline-content-wrapper {
@@ -241,16 +306,16 @@ body {
   font-size: 18px;
 }
 
-/* Info Panel */
+/* Info Panel - Compressed Spacing */
 .info-content h3 {
   margin-top: 0;
-  margin-bottom: 16px;
+  margin-bottom: 8px;
   font-size: 18px;
   color: #fff;
 }
 
 .info-item {
-  margin: 12px 0;
+  margin: 6px 0;
   font-size: 14px;
   color: #ccc;
 }

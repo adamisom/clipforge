@@ -5,6 +5,9 @@ declare global {
   interface Window {
     electron: ElectronAPI
     api: {
+      // File utilities
+      getPathForFile: (file: File) => string
+
       // Invoke methods (request-response)
       selectVideoFile: () => Promise<string | null>
       resizeWindow: (width: number, height: number) => Promise<void>
