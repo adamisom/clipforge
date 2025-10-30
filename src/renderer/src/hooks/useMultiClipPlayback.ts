@@ -78,9 +78,25 @@ export const useMultiClipPlayback = (clips: TimelineClip[]): UseMultiClipPlaybac
     // Don't pause here - let the Timeline component handle pause/resume logic
   }, [])
 
-  const play = useCallback(() => setIsPlaying(true), [])
+  const play = useCallback(() => {
+    // If at the end of timeline, restart from beginning
+    if (playheadPosition >= totalDuration) {
+      setPlayheadPosition(0)
+    }
+    setIsPlaying(true)
+  }, [playheadPosition, totalDuration])
+
   const pause = useCallback(() => setIsPlaying(false), [])
-  const togglePlayPause = useCallback(() => setIsPlaying((prev) => !prev), [])
+
+  const togglePlayPause = useCallback(() => {
+    if (!isPlaying) {
+      // If at the end of timeline, restart from beginning
+      if (playheadPosition >= totalDuration) {
+        setPlayheadPosition(0)
+      }
+    }
+    setIsPlaying((prev) => !prev)
+  }, [isPlaying, playheadPosition, totalDuration])
 
   return {
     playheadPosition,

@@ -169,19 +169,24 @@ function VideoEditor({
     handlePlayheadChange
   ])
 
-  // Listen for Cmd+K keyboard shortcut for split and Delete/Backspace for delete
+  // Listen for keyboard shortcuts: Cmd+K (split), Delete/Backspace (delete), Spacebar (play/pause)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent): void => {
+      // Ignore if typing in an input field
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return
+      }
+
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault()
         handleSplitAtPlayhead()
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
-        // Only delete if not typing in an input
-        if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
-          return
-        }
         e.preventDefault()
         handleDeleteClip()
+      } else if (e.key === ' ' || e.code === 'Space') {
+        // Spacebar for play/pause
+        e.preventDefault()
+        togglePlayPause()
       }
     }
 
@@ -190,7 +195,7 @@ function VideoEditor({
     return () => {
       window.removeEventListener('keydown', handleKeyDown)
     }
-  }, [handleSplitAtPlayhead, handleDeleteClip])
+  }, [handleSplitAtPlayhead, handleDeleteClip, togglePlayPause])
 
   const handleExport = useCallback(async (): Promise<void> => {
     if (clips.length === 0) return

@@ -42,14 +42,20 @@ function VideoPreview({
   useEffect(() => {
     if (videoRef.current && sourcePath) {
       videoRef.current.currentTime = trimStart
-      // If we're supposed to be playing, start playback after loading
-      if (isPlaying) {
-        videoRef.current.play().catch((err) => {
-          console.error('Failed to auto-play after clip change:', err)
-        })
-      }
     }
-  }, [sourcePath, trimStart, isPlaying])
+  }, [sourcePath, trimStart])
+
+  // Handle auto-play when clip changes (separate from initialization)
+  useEffect(() => {
+    if (!videoRef.current || !sourcePath) return
+
+    // Only auto-play when we change clips while already playing
+    if (isPlaying) {
+      videoRef.current.play().catch((err) => {
+        console.error('Failed to auto-play after clip change:', err)
+      })
+    }
+  }, [sourcePath, isPlaying])
 
   // Handle time updates during playback
   const handleTimeUpdate = (): void => {
