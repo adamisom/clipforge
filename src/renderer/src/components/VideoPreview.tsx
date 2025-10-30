@@ -45,6 +45,18 @@ function VideoPreview({
     }
   }, [sourcePath, trimStart])
 
+  // Handle auto-play when clip changes (separate from initialization)
+  useEffect(() => {
+    if (!videoRef.current || !sourcePath) return
+
+    // Only auto-play when we change clips while already playing
+    if (isPlaying) {
+      videoRef.current.play().catch((err) => {
+        console.error('Failed to auto-play after clip change:', err)
+      })
+    }
+  }, [sourcePath, isPlaying])
+
   // Handle time updates during playback
   const handleTimeUpdate = (): void => {
     if (!videoRef.current) return
@@ -53,10 +65,9 @@ function VideoPreview({
 
     // Check if we've reached the trim end
     if (currentTime >= trimEnd) {
-      videoRef.current.pause()
-      videoRef.current.currentTime = trimStart
-      onTimeUpdate(0)
-      onPlayPause() // Stop playback
+      // Don't pause here - let parent hook handle clip advancement
+      // Just report that we've reached the end
+      onTimeUpdate(trimEnd - trimStart)
     } else {
       // Update playhead position (relative to trim start)
       onTimeUpdate(currentTime - trimStart)

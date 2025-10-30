@@ -1,23 +1,21 @@
 import { useState, useEffect } from 'react'
 
 interface ExportButtonProps {
-  sourcePath: string | null
-  trimStart: number
-  trimEnd: number
+  hasClips: boolean
   onExport: () => void
+  isExporting?: boolean
 }
 
 function ExportButton({
-  sourcePath,
-  trimStart,
-  trimEnd,
-  onExport
+  hasClips,
+  onExport,
+  isExporting: propIsExporting
 }: ExportButtonProps): React.JSX.Element {
   const [isExporting, setIsExporting] = useState(false)
   const [exportProgress, setExportProgress] = useState(0)
   const [exportError, setExportError] = useState<string | null>(null)
 
-  const isDisabled = !sourcePath || isExporting
+  const isDisabled = !hasClips || isExporting || propIsExporting
 
   // Listen for export events
   useEffect(() => {
@@ -62,7 +60,7 @@ function ExportButton({
   return (
     <div className="export-container">
       <button onClick={handleClick} disabled={isDisabled} className="export-button">
-        {isExporting ? `Exporting... ${exportProgress}%` : 'Export Video'}
+        {isExporting ? `Exporting... ${exportProgress}%` : 'Export Timeline'}
       </button>
       {isExporting && (
         <div className="export-progress-bar">
@@ -70,12 +68,6 @@ function ExportButton({
         </div>
       )}
       {exportError && <div className="export-error">Error: {exportError}</div>}
-      <div className="export-info">
-        <small>
-          Trim: {trimStart.toFixed(1)}s - {trimEnd.toFixed(1)}s ({(trimEnd - trimStart).toFixed(1)}s
-          total)
-        </small>
-      </div>
     </div>
   )
 }

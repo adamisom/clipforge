@@ -5,10 +5,24 @@ import { electronAPI } from '@electron-toolkit/preload'
 const api = {
   // Invoke methods (request-response)
   selectVideoFile: () => ipcRenderer.invoke('select-video-file'),
+  resizeWindow: (width: number, height: number) =>
+    ipcRenderer.invoke('resize-window', width, height),
   getVideoMetadata: (path: string) => ipcRenderer.invoke('get-video-metadata', path),
   exportVideo: (sourcePath: string, outputPath: string, trimStart: number, duration: number) =>
     ipcRenderer.invoke('export-video', { sourcePath, outputPath, trimStart, duration }),
+  exportMultiClip: (clips: unknown[], outputPath: string) =>
+    ipcRenderer.invoke('export-multi-clip', clips, outputPath),
   selectSavePath: () => ipcRenderer.invoke('select-save-path'),
+  saveRecordingBlob: (arrayBuffer: ArrayBuffer) =>
+    ipcRenderer.invoke('save-recording-blob', arrayBuffer),
+  saveRecordingPermanent: (tempPath: string) =>
+    ipcRenderer.invoke('save-recording-permanent', tempPath),
+  getScreenSources: () => ipcRenderer.invoke('get-screen-sources'),
+  startRecording: () => ipcRenderer.invoke('start-recording'),
+  startRecordingNoMinimize: () => ipcRenderer.invoke('start-recording-no-minimize'),
+  stopRecording: () => ipcRenderer.invoke('stop-recording'),
+  onStopRecording: (callback) => ipcRenderer.on('stop-recording', callback),
+  isTempFile: (filePath: string) => ipcRenderer.invoke('is-temp-file', filePath),
 
   // Event listeners (one-way events)
   onExportProgress: (callback: (event: IpcRendererEvent, progress: { percent: number }) => void) =>
@@ -21,6 +35,14 @@ const api = {
     ipcRenderer.on('menu-import', callback),
   onMenuExport: (callback: (event: IpcRendererEvent) => void) =>
     ipcRenderer.on('menu-export', callback),
+  onMenuRecordWebcam: (callback: (event: IpcRendererEvent) => void) =>
+    ipcRenderer.on('menu-record-webcam', callback),
+  onMenuRecordScreen: (callback: (event: IpcRendererEvent) => void) =>
+    ipcRenderer.on('menu-record-screen', callback),
+  onCheckUnsavedRecordings: (callback: () => void) =>
+    ipcRenderer.on('check-unsaved-recordings', callback),
+  respondUnsavedRecordings: (hasTempFiles: boolean) =>
+    ipcRenderer.send('unsaved-recordings-response', { hasTempFiles }),
   removeAllListeners: (channel: string) => ipcRenderer.removeAllListeners(channel)
 }
 

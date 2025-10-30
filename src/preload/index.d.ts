@@ -7,6 +7,7 @@ declare global {
     api: {
       // Invoke methods (request-response)
       selectVideoFile: () => Promise<string | null>
+      resizeWindow: (width: number, height: number) => Promise<void>
       getVideoMetadata: (path: string) => Promise<{
         duration: number
         width: number
@@ -20,7 +21,24 @@ declare global {
         start: number,
         dur: number
       ) => Promise<{ success: boolean }>
+      exportMultiClip: (
+        clips: Array<{
+          id: string
+          sourcePath: string
+          sourceStartTime: number
+          timelineDuration: number
+        }>,
+        outputPath: string
+      ) => Promise<{ success: boolean }>
       selectSavePath: () => Promise<string | null>
+      saveRecordingBlob: (arrayBuffer: ArrayBuffer) => Promise<string>
+      saveRecordingPermanent: (tempPath: string) => Promise<{ saved: boolean; path: string }>
+      getScreenSources: () => Promise<Array<{ id: string; name: string; thumbnail: string }>>
+      startRecording: () => Promise<void>
+      startRecordingNoMinimize: () => Promise<void>
+      stopRecording: () => Promise<void>
+      onStopRecording: (callback: () => void) => void
+      isTempFile: (filePath: string) => Promise<boolean>
 
       // Event listeners (one-way events)
       onExportProgress: (
@@ -32,6 +50,10 @@ declare global {
       ) => void
       onMenuImport: (callback: (event: IpcRendererEvent) => void) => void
       onMenuExport: (callback: (event: IpcRendererEvent) => void) => void
+      onMenuRecordWebcam: (callback: (event: IpcRendererEvent) => void) => void
+      onMenuRecordScreen: (callback: (event: IpcRendererEvent) => void) => void
+      onCheckUnsavedRecordings: (callback: () => void) => void
+      respondUnsavedRecordings: (hasTempFiles: boolean) => void
       removeAllListeners: (channel: string) => void
     }
   }

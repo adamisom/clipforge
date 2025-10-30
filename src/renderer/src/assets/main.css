@@ -68,6 +68,41 @@ body {
   background: #0066ff;
 }
 
+.welcome-divider {
+  margin: 24px 0;
+  color: #555;
+  font-size: 14px;
+  position: relative;
+}
+
+.welcome-hint {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 8px;
+}
+
+.welcome-record-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.welcome-record-button {
+  padding: 8px 20px;
+  font-size: 24px;
+  background: #4a9eff;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+  line-height: 1;
+}
+
+.welcome-record-button:hover {
+  background: #3a8eef;
+}
+
 /* Video Editor Layout */
 .video-editor {
   display: grid;
@@ -93,9 +128,47 @@ body {
   grid-row: 2;
   grid-column: 1 / 3;
   border-top: 1px solid #333;
+  display: flex;
+  flex-direction: column;
+}
+
+.timeline-toolbar {
+  display: flex;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #2a2a2a;
+  border-bottom: 1px solid #333;
+  flex-shrink: 0;
+}
+
+.timeline-toolbar-button {
+  padding: 6px 14px;
+  font-size: 14px;
+  background: #4a9eff;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.timeline-toolbar-button:hover {
+  background: #3a8eef;
+}
+
+.timeline-content-wrapper {
+  flex: 1;
   overflow-x: auto;
   overflow-y: hidden;
   padding-left: 60px; /* Add left padding so trim handles are easier to grab */
+}
+
+.timeline-container {
+  position: relative;
+  height: 100%;
 }
 
 .info-panel {
@@ -170,9 +243,32 @@ body {
   align-items: center;
   padding: 0 8px;
   font-size: 14px;
-  cursor: move;
+  cursor: pointer;
   will-change: transform;
   contain: layout style paint;
+  border: 2px solid transparent;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.timeline-clip:hover {
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.timeline-clip.selected {
+  border-color: #64ff64;
+  box-shadow: 0 0 8px rgba(100, 255, 100, 0.5);
+  background: #5aa0f2;
+}
+
+.timeline-clip.temp-file {
+  border-color: #ffa500;
+  opacity: 0.9;
+}
+
+.temp-indicator {
+  margin-right: 6px;
+  font-size: 16px;
+  filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.5));
 }
 
 /* Trim handles */
@@ -210,9 +306,28 @@ body {
   bottom: 0;
   width: 2px;
   background: red;
-  cursor: ew-resize;
   z-index: 100;
   will-change: transform;
+  pointer-events: none; /* Line itself not interactive */
+}
+
+.playhead::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top: 12px solid red;
+  cursor: grab;
+  pointer-events: auto; /* Handle is interactive */
+}
+
+.playhead:active::before {
+  cursor: grabbing;
 }
 
 /* Video Preview */
@@ -322,4 +437,503 @@ body {
   color: #888;
   font-size: 12px;
   text-align: center;
+}
+
+/* Webcam Recorder */
+.webcam-recorder-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.webcam-recorder-modal {
+  position: relative;
+  width: 640px;
+  max-width: 90vw;
+}
+
+.webcam-preview {
+  width: 100%;
+  border-radius: 12px;
+  background: #000;
+}
+
+.countdown-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.7);
+  border-radius: 12px;
+}
+
+.countdown-number {
+  font-size: 120px;
+  font-weight: bold;
+  color: #ffffff;
+  animation: countdown-pulse 1s ease-in-out;
+}
+
+.countdown-cancel-hint {
+  margin-top: 20px;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.countdown-cancel-hint kbd {
+  background: rgba(255, 255, 255, 0.2);
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 13px;
+}
+
+.stop-recording-hint {
+  margin-top: 40px;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.stop-hint-primary {
+  font-size: 18px;
+  color: rgba(255, 255, 255, 0.95);
+  margin-bottom: 12px;
+  font-weight: 500;
+}
+
+.stop-hint-shortcut {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 24px;
+  font-weight: bold;
+  color: white;
+}
+
+.stop-hint-shortcut kbd {
+  background: linear-gradient(180deg, #ffffff 0%, #e0e0e0 100%);
+  color: #333;
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 20px;
+  font-weight: 600;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  min-width: 50px;
+  text-align: center;
+}
+
+@keyframes countdown-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 0.8;
+  }
+}
+
+.recording-indicator {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  background: rgba(0, 0, 0, 0.8);
+  padding: 6px 12px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: white;
+  font-weight: 500;
+  z-index: 10; /* Ensure it's above the video modal */
+}
+
+.recording-dot {
+  color: #ff3b30;
+  font-size: 16px;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+.webcam-controls {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+.webcam-controls button {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.start-button {
+  background: #646cff;
+  color: white;
+}
+
+.start-button:hover {
+  background: #535bf2;
+}
+
+.stop-button {
+  background: #ff3b30;
+  color: white;
+}
+
+.stop-button:hover {
+  background: #e02d20;
+}
+
+.cancel-button {
+  background: #444;
+  color: white;
+}
+
+.cancel-button:hover {
+  background: #555;
+}
+
+.error-message {
+  color: white;
+  text-align: center;
+  padding: 40px;
+}
+
+/* Screen Source Picker */
+.screen-source-picker-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.screen-source-picker-modal {
+  background: #2a2a2a;
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 800px;
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.screen-source-picker-modal h2 {
+  margin-top: 0;
+  color: #ffffff;
+  margin-bottom: 20px;
+}
+
+/* Permission error styling */
+.screen-source-picker-modal.permission-error {
+  max-width: 500px;
+  text-align: center;
+}
+
+.permission-icon {
+  font-size: 64px;
+  margin-bottom: 20px;
+}
+
+.permission-error h2 {
+  font-size: 24px;
+  margin-bottom: 12px;
+}
+
+.error-text {
+  color: #ff6b6b;
+  margin-bottom: 24px;
+  line-height: 1.6;
+}
+
+.permission-steps {
+  background: #1a1a1a;
+  padding: 20px;
+  border-radius: 8px;
+  margin-bottom: 24px;
+  text-align: left;
+}
+
+.permission-steps h3 {
+  color: #ffffff;
+  margin-top: 0;
+  margin-bottom: 12px;
+  font-size: 16px;
+}
+
+.permission-steps ol {
+  margin: 0;
+  padding-left: 20px;
+  color: #cccccc;
+}
+
+.permission-steps li {
+  margin-bottom: 8px;
+  line-height: 1.6;
+}
+
+.permission-steps strong {
+  color: #ffffff;
+}
+
+.primary-button {
+  background: #646cff;
+  color: white;
+  border: none;
+  padding: 12px 32px;
+  border-radius: 8px;
+  font-size: 16px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+
+.primary-button:hover {
+  background: #535bf2;
+}
+
+.source-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.source-item {
+  background: #1a1a1a;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  padding: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.source-item:hover {
+  border-color: #646cff;
+  transform: translateY(-2px);
+}
+
+.source-thumbnail {
+  width: 100%;
+  height: auto;
+  border-radius: 4px;
+  margin-bottom: 8px;
+}
+
+.source-name {
+  color: #ffffff;
+  font-size: 14px;
+  margin: 0;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.picker-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 24px;
+}
+
+.picker-cancel-button {
+  padding: 12px 32px;
+  font-size: 16px;
+  background: #2a2a2a;
+  color: #ffffff;
+  border: 1px solid #444;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.picker-cancel-button:hover {
+  background: #3a3a3a;
+  border-color: #646cff;
+}
+
+/* Countdown fullscreen */
+.countdown-overlay.fullscreen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.9);
+  z-index: 2000;
+}
+
+.countdown-overlay.fullscreen p {
+  color: white;
+  margin-top: 20px;
+  font-size: 18px;
+}
+
+/* Recording overlay (shown when recording is active) */
+.recording-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.95);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10000;
+}
+
+/* Screen Recorder - Ready Dialog */
+.ready-dialog {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 32px 48px;
+  text-align: center;
+  backdrop-filter: blur(10px);
+  max-width: 500px;
+}
+
+.ready-dialog h2 {
+  color: white;
+  margin: 0 0 16px 0;
+  font-size: 24px;
+}
+
+.ready-dialog p {
+  color: rgba(255, 255, 255, 0.9);
+  margin: 12px 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.ready-dialog kbd {
+  background: rgba(255, 255, 255, 0.2);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 12px;
+}
+
+.ready-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 24px;
+}
+
+.ready-actions button {
+  padding: 10px 24px;
+  border-radius: 6px;
+  border: none;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.ready-actions .start-button {
+  background: #007aff;
+  color: white;
+}
+
+.ready-actions .start-button:hover {
+  background: #0051d5;
+}
+
+.ready-actions .cancel-button {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+}
+
+.ready-actions .cancel-button:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.recording-indicator-box {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 32px 48px;
+  text-align: center;
+  backdrop-filter: blur(10px);
+}
+
+.recording-indicator-box .recording-dot {
+  width: 16px;
+  height: 16px;
+  background: #ff3b30;
+  border-radius: 50%;
+  margin: 0 auto 16px;
+  animation: recording-pulse 1.5s infinite;
+}
+
+@keyframes recording-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.1);
+  }
+}
+
+.recording-indicator-box p {
+  color: white;
+  margin: 8px 0;
+  font-size: 16px;
+}
+
+.recording-indicator-box .recording-hint {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
+  margin-top: 16px;
+}
+
+.recording-indicator-box kbd {
+  background: rgba(255, 255, 255, 0.2);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 12px;
 }
