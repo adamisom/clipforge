@@ -69,7 +69,7 @@ function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): 
     try {
       // NOW get the screen stream (capturing starts here)
       const constraints = {
-        audio: false,
+        audio: true, // Capture microphone audio
         video: {
           mandatory: {
             chromeMediaSource: 'desktop',
