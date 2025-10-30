@@ -230,6 +230,14 @@ function WebcamRecorder({ onRecordingComplete, onClose }: WebcamRecorderProps): 
         {stage === 'countdown' && countdown !== null && (
           <div className="countdown-overlay">
             <div className="countdown-number">{countdown}</div>
+            <div className="stop-recording-hint">
+              <p className="stop-hint-primary">
+                To stop recording, click the button below or press:
+              </p>
+              <div className="stop-hint-shortcut">
+                <kbd>Cmd</kbd> + <kbd>Shift</kbd> + <kbd>S</kbd>
+              </div>
+            </div>
             <p className="countdown-cancel-hint">
               Press <kbd>Esc</kbd> to cancel
             </p>

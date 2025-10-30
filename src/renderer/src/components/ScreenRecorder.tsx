@@ -293,6 +293,12 @@ function ScreenRecorder({ onRecordingComplete, onClose }: ScreenRecorderProps): 
       <div className="countdown-overlay fullscreen">
         <div className="countdown-number">{countdown}</div>
         <p>Get ready to record...</p>
+        <div className="stop-recording-hint">
+          <p className="stop-hint-primary">To stop recording, press:</p>
+          <div className="stop-hint-shortcut">
+            <kbd>Cmd</kbd> + <kbd>Shift</kbd> + <kbd>S</kbd>
+          </div>
+        </div>
         <p className="countdown-cancel-hint">
           Press <kbd>Esc</kbd> to cancel
         </p>
