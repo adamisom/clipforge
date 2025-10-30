@@ -100,7 +100,7 @@ function SimultaneousRecorder({
 
   const startRecording = async (): Promise<void> => {
     try {
-      // Get screen stream with microphone audio
+      // Get screen stream (video only, no audio to avoid duplication)
       const screenStream = await navigator.mediaDevices.getUserMedia({
         video: {
           mandatory: {
@@ -108,7 +108,7 @@ function SimultaneousRecorder({
             chromeMediaSourceId: selectedSourceId
           }
         } as MediaTrackConstraints,
-        audio: true // Capture microphone audio
+        audio: false // No audio - webcam will capture microphone
       })
       screenStreamRef.current = screenStream
 
