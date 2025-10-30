@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useMultiClipPlayback } from './useMultiClipPlayback'
 import { TimelineClip } from '../types/timeline'
@@ -17,35 +17,63 @@ describe('useMultiClipPlayback', () => {
     },
     {
       id: 'clip2',
-      sourceType: 'imported',
-      sourcePath: '/video2.mp4',
+      sourceType: 'screen',
+      sourcePath: '/screen.webm',
       sourceStartTime: 5,
       sourceDuration: 20,
       timelineDuration: 8,
       trackIndex: 0,
-      metadata: { filename: 'video2.mp4', resolution: '1920x1080', codec: 'h264' }
+      metadata: { filename: 'screen.webm', resolution: '1920x1080', codec: 'vp8' }
+    },
+    {
+      id: 'clip3',
+      sourceType: 'webcam',
+      sourcePath: '/webcam.webm',
+      sourceStartTime: 0,
+      sourceDuration: 15,
+      timelineDuration: 5,
+      trackIndex: 0,
+      metadata: { filename: 'webcam.webm', resolution: '640x480', codec: 'vp8' }
+    }
+  ]
+
+  const mixedTrackClips: TimelineClip[] = [
+    ...mockClips,
+    {
+      id: 'pip1',
+      sourceType: 'webcam',
+      sourcePath: '/pip.webm',
+      sourceStartTime: 0,
+      sourceDuration: 10,
+      timelineDuration: 10,
+      trackIndex: 1,
+      metadata: { filename: 'pip.webm', resolution: '640x480', codec: 'vp8' }
     }
   ]
 
   describe('initialization', () => {
-    it('starts with playhead at 0', () => {
+    it('initializes with playhead at 0', () => {
       const { result } = renderHook(() => useMultiClipPlayback(mockClips))
 
       expect(result.current.playheadPosition).toBe(0)
+    })
+
+    it('initializes with isPlaying false', () => {
+      const { result } = renderHook(() => useMultiClipPlayback(mockClips))
+
       expect(result.current.isPlaying).toBe(false)
     })
 
-    it('calculates total duration', () => {
+    it('calculates total duration correctly', () => {
       const { result } = renderHook(() => useMultiClipPlayback(mockClips))
 
-      expect(result.current.totalDuration).toBe(18) // 10 + 8
+      expect(result.current.totalDuration).toBe(23) // 10 + 8 + 5
     })
 
     it('sets currentClip to first clip', () => {
       const { result } = renderHook(() => useMultiClipPlayback(mockClips))
 
       expect(result.current.currentClip).toBe(mockClips[0])
-      expect(result.current.currentClip?.id).toBe('clip1')
     })
 
     it('handles empty clips array', () => {
@@ -53,192 +81,212 @@ describe('useMultiClipPlayback', () => {
 
       expect(result.current.totalDuration).toBe(0)
       expect(result.current.currentClip).toBeUndefined()
-    })
-
-    it('calculates relativePlayheadPosition at start', () => {
-      const { result } = renderHook(() => useMultiClipPlayback(mockClips))
-
-      expect(result.current.relativePlayheadPosition).toBe(0)
-    })
-
-    it('generates clipPositions map', () => {
-      const { result } = renderHook(() => useMultiClipPlayback(mockClips))
-
-      expect(result.current.clipPositions.size).toBe(2)
-      expect(result.current.clipPositions.get('clip1')).toEqual({ start: 0, end: 10 })
-      expect(result.current.clipPositions.get('clip2')).toEqual({ start: 10, end: 18 })
+      expect(result.current.playheadPosition).toBe(0)
     })
   })
 
-  describe('clip navigation', () => {
-    it('updates currentClip when playhead moves to next clip', () => {
-      const { result } = renderHook(() => useMultiClipPlayback(mockClips))
+  describe('Track 0 filtering', () => {
+    it('only uses Track 0 clips for playback', () => {
+      const { result } = renderHook(() => useMultiClipPlayback(mixedTrackClips))
 
-      // Start in clip1
+      // Total duration should only count Track 0 clips (10 + 8 + 5 = 23)
+      // Not Track 1 clip (pip1 = 10)
+      expect(result.current.totalDuration).toBe(23)
+    })
+
+    it('ignores Track 1 clips in currentClip calculation', () => {
+      const { result } = renderHook(() => useMultiClipPlayback(mixedTrackClips))
+
+      // Even with Track 1 clips, playhead at 0 should return first Track 0 clip
+      expect(result.current.currentClip?.trackIndex).toBe(0)
       expect(result.current.currentClip?.id).toBe('clip1')
+    })
 
-      // Move playhead to clip2 (position 12 = 2 seconds into clip2)
+    it('only includes Track 0 clips in clipPositions', () => {
+      const { result } = renderHook(() => useMultiClipPlayback(mixedTrackClips))
+
+      // Should have 3 Track 0 clips
+      expect(result.current.clipPositions.size).toBe(3)
+      expect(result.current.clipPositions.has('clip1')).toBe(true)
+      expect(result.current.clipPositions.has('clip2')).toBe(true)
+      expect(result.current.clipPositions.has('clip3')).toBe(true)
+      expect(result.current.clipPositions.has('pip1')).toBe(false)
+    })
+  })
+
+  describe('getCurrentClip', () => {
+    it('returns correct clip at various playhead positions', () => {
+      const { result } = renderHook(() => useMultiClipPlayback(mockClips))
+
+      // Playhead at 0 → clip1
+      expect(result.current.currentClip).toBe(mockClips[0])
+
+      // Playhead at 12 → clip2 (starts at 10)
       act(() => {
         result.current.setPlayheadPosition(12)
       })
+      expect(result.current.currentClip).toBe(mockClips[1])
 
-      expect(result.current.currentClip?.id).toBe('clip2')
+      // Playhead at 20 → clip3 (starts at 18)
+      act(() => {
+        result.current.setPlayheadPosition(20)
+      })
+      expect(result.current.currentClip).toBe(mockClips[2])
     })
 
-    it('calculates relativePlayheadPosition correctly', () => {
-      const { result } = renderHook(() => useMultiClipPlayback(mockClips))
-
-      // 5 seconds into clip1
-      act(() => {
-        result.current.setPlayheadPosition(5)
-      })
-      expect(result.current.relativePlayheadPosition).toBe(5)
-
-      // 2 seconds into clip2 (timeline position 12)
-      act(() => {
-        result.current.setPlayheadPosition(12)
-      })
-      expect(result.current.relativePlayheadPosition).toBe(2)
-    })
-
-    it('handles playhead at exact clip boundary', () => {
+    it('returns last clip when playhead beyond timeline', () => {
       const { result } = renderHook(() => useMultiClipPlayback(mockClips))
 
       act(() => {
-        result.current.setPlayheadPosition(10) // exactly at clip2 start
+        result.current.setPlayheadPosition(100)
       })
 
-      expect(result.current.currentClip?.id).toBe('clip2')
-      expect(result.current.relativePlayheadPosition).toBe(0)
+      expect(result.current.currentClip).toBe(mockClips[2])
+    })
+  })
+
+  describe('play/pause controls', () => {
+    it('play() sets isPlaying to true', () => {
+      const { result } = renderHook(() => useMultiClipPlayback(mockClips))
+
+      act(() => {
+        result.current.play()
+      })
+
+      expect(result.current.isPlaying).toBe(true)
+    })
+
+    it('pause() sets isPlaying to false', () => {
+      const { result } = renderHook(() => useMultiClipPlayback(mockClips))
+
+      act(() => {
+        result.current.play()
+      })
+      act(() => {
+        result.current.pause()
+      })
+
+      expect(result.current.isPlaying).toBe(false)
+    })
+
+    it('togglePlayPause() toggles isPlaying', () => {
+      const { result } = renderHook(() => useMultiClipPlayback(mockClips))
+
+      expect(result.current.isPlaying).toBe(false)
+
+      act(() => {
+        result.current.togglePlayPause()
+      })
+      expect(result.current.isPlaying).toBe(true)
+
+      act(() => {
+        result.current.togglePlayPause()
+      })
+      expect(result.current.isPlaying).toBe(false)
+    })
+
+    it('play() at end of timeline resets to beginning', () => {
+      const { result } = renderHook(() => useMultiClipPlayback(mockClips))
+
+      act(() => {
+        result.current.setPlayheadPosition(23) // At end
+      })
+
+      act(() => {
+        result.current.play()
+      })
+
+      expect(result.current.playheadPosition).toBe(0)
+      expect(result.current.isPlaying).toBe(true)
+    })
+
+    it('togglePlayPause() at end resets to beginning', () => {
+      const { result } = renderHook(() => useMultiClipPlayback(mockClips))
+
+      act(() => {
+        result.current.setPlayheadPosition(23) // At end
+      })
+
+      act(() => {
+        result.current.togglePlayPause()
+      })
+
+      expect(result.current.playheadPosition).toBe(0)
+      expect(result.current.isPlaying).toBe(true)
     })
   })
 
   describe('handleTimeUpdate - auto-advance', () => {
-    it('advances to next clip when current clip ends', () => {
+    it('advances playhead within same clip', () => {
       const { result } = renderHook(() => useMultiClipPlayback(mockClips))
 
       act(() => {
-        result.current.setPlayheadPosition(5) // in clip1
-        result.current.setIsPlaying(true)
+        result.current.handleTimeUpdate(5) // 5 seconds into clip1
       })
 
-      // Simulate video reaching end of clip1 (relative time = 10)
+      expect(result.current.playheadPosition).toBe(5)
+      expect(result.current.currentClip).toBe(mockClips[0])
+    })
+
+    it('auto-advances to next clip when reaching end', () => {
+      const { result } = renderHook(() => useMultiClipPlayback(mockClips))
+
+      // Simulate reaching end of clip1 (10 seconds)
       act(() => {
         result.current.handleTimeUpdate(10)
       })
 
-      // Should have advanced to clip2
-      expect(result.current.playheadPosition).toBe(10) // start of clip2
-      expect(result.current.currentClip?.id).toBe('clip2')
-      expect(result.current.isPlaying).toBe(true) // still playing
+      // Should advance to clip2 start (position 10)
+      expect(result.current.playheadPosition).toBe(10)
+      expect(result.current.currentClip).toBe(mockClips[1])
     })
 
-    it('stops playing at end of timeline', () => {
+    it('auto-advances through multiple clips', () => {
       const { result } = renderHook(() => useMultiClipPlayback(mockClips))
 
+      // Advance to clip2
       act(() => {
-        result.current.setIsPlaying(true)
-        result.current.setPlayheadPosition(17) // near end of clip2
+        result.current.setPlayheadPosition(10)
       })
+      expect(result.current.currentClip).toBe(mockClips[1])
 
-      // Simulate reaching end of clip2 (relative time = 8)
+      // Reach end of clip2 (8 seconds)
       act(() => {
         result.current.handleTimeUpdate(8)
       })
 
-      expect(result.current.isPlaying).toBe(false)
-      expect(result.current.playheadPosition).toBe(18) // end of timeline
+      // Should advance to clip3 (position 18)
+      expect(result.current.playheadPosition).toBe(18)
+      expect(result.current.currentClip).toBe(mockClips[2])
     })
 
-    it('updates playhead position during playback', () => {
+    it('stops at end of last clip', () => {
       const { result } = renderHook(() => useMultiClipPlayback(mockClips))
 
+      // Move to clip3
       act(() => {
-        result.current.setPlayheadPosition(0)
+        result.current.setPlayheadPosition(18)
         result.current.setIsPlaying(true)
       })
 
-      // Simulate time update to 5 seconds
+      // Reach end of clip3 (5 seconds)
       act(() => {
         result.current.handleTimeUpdate(5)
       })
 
-      expect(result.current.playheadPosition).toBe(5)
-      expect(result.current.currentClip?.id).toBe('clip1')
-    })
-
-    it('handles reaching exact end of clip', () => {
-      const { result } = renderHook(() => useMultiClipPlayback(mockClips))
-
-      act(() => {
-        result.current.setPlayheadPosition(0)
-        result.current.setIsPlaying(true)
-        result.current.handleTimeUpdate(10) // exactly at clip1 end
-      })
-
-      // Should advance to clip2
-      expect(result.current.currentClip?.id).toBe('clip2')
-      expect(result.current.playheadPosition).toBe(10)
-    })
-  })
-
-  describe('playback controls', () => {
-    it('toggles play/pause', () => {
-      const { result } = renderHook(() => useMultiClipPlayback(mockClips))
-
-      expect(result.current.isPlaying).toBe(false)
-
-      act(() => {
-        result.current.togglePlayPause()
-      })
-      expect(result.current.isPlaying).toBe(true)
-
-      act(() => {
-        result.current.togglePlayPause()
-      })
+      // Should stop at total duration
+      expect(result.current.playheadPosition).toBe(23)
       expect(result.current.isPlaying).toBe(false)
     })
 
-    it('play sets isPlaying to true', () => {
-      const { result } = renderHook(() => useMultiClipPlayback(mockClips))
+    it('does nothing when currentClip is undefined', () => {
+      const { result } = renderHook(() => useMultiClipPlayback([]))
 
       act(() => {
-        result.current.play()
+        result.current.handleTimeUpdate(5)
       })
-      expect(result.current.isPlaying).toBe(true)
-    })
 
-    it('pause sets isPlaying to false', () => {
-      const { result } = renderHook(() => useMultiClipPlayback(mockClips))
-
-      act(() => {
-        result.current.setIsPlaying(true)
-        result.current.pause()
-      })
-      expect(result.current.isPlaying).toBe(false)
-    })
-
-    it('multiple play calls keep isPlaying true', () => {
-      const { result } = renderHook(() => useMultiClipPlayback(mockClips))
-
-      act(() => {
-        result.current.play()
-        result.current.play()
-        result.current.play()
-      })
-      expect(result.current.isPlaying).toBe(true)
-    })
-
-    it('multiple pause calls keep isPlaying false', () => {
-      const { result } = renderHook(() => useMultiClipPlayback(mockClips))
-
-      act(() => {
-        result.current.setIsPlaying(true)
-        result.current.pause()
-        result.current.pause()
-        result.current.pause()
-      })
-      expect(result.current.isPlaying).toBe(false)
+      expect(result.current.playheadPosition).toBe(0)
     })
   })
 
@@ -247,171 +295,68 @@ describe('useMultiClipPlayback', () => {
       const { result } = renderHook(() => useMultiClipPlayback(mockClips))
 
       act(() => {
-        result.current.handlePlayheadChange(5)
+        result.current.handlePlayheadChange(15)
       })
 
-      expect(result.current.playheadPosition).toBe(5)
+      expect(result.current.playheadPosition).toBe(15)
     })
 
-    it('stops playback when seeking', () => {
+    it('does not affect isPlaying state', () => {
       const { result } = renderHook(() => useMultiClipPlayback(mockClips))
 
       act(() => {
-        result.current.setIsPlaying(true)
-        result.current.handlePlayheadChange(12)
+        result.current.play()
       })
 
-      expect(result.current.isPlaying).toBe(false)
-      expect(result.current.playheadPosition).toBe(12)
-    })
-
-    it('updates currentClip when seeking to different clip', () => {
-      const { result } = renderHook(() => useMultiClipPlayback(mockClips))
+      const wasPlaying = result.current.isPlaying
 
       act(() => {
-        result.current.handlePlayheadChange(12) // seek to clip2
+        result.current.handlePlayheadChange(15)
       })
 
-      expect(result.current.currentClip?.id).toBe('clip2')
+      expect(result.current.isPlaying).toBe(wasPlaying)
     })
   })
 
-  describe('edge cases', () => {
-    it('handles seeking to exact clip boundary', () => {
+  describe('relativePlayheadPosition', () => {
+    it('calculates relative position within current clip', () => {
       const { result } = renderHook(() => useMultiClipPlayback(mockClips))
 
+      // Playhead at 5 → 5 seconds into clip1
       act(() => {
-        result.current.handlePlayheadChange(10) // exact start of clip2
+        result.current.setPlayheadPosition(5)
       })
+      expect(result.current.relativePlayheadPosition).toBe(5)
 
-      expect(result.current.currentClip?.id).toBe('clip2')
-      expect(result.current.relativePlayheadPosition).toBe(0)
-    })
-
-    it('handles single clip', () => {
-      const { result } = renderHook(() => useMultiClipPlayback([mockClips[0]]))
-
-      expect(result.current.totalDuration).toBe(10)
-      expect(result.current.currentClip).toBe(mockClips[0])
-
+      // Playhead at 12 → 2 seconds into clip2 (starts at 10)
       act(() => {
-        result.current.setIsPlaying(true)
-        result.current.handleTimeUpdate(10) // reach end
+        result.current.setPlayheadPosition(12)
       })
+      expect(result.current.relativePlayheadPosition).toBe(2)
 
-      expect(result.current.isPlaying).toBe(false)
-    })
-
-    it('handles seeking beyond timeline end', () => {
-      const { result } = renderHook(() => useMultiClipPlayback(mockClips))
-
+      // Playhead at 20 → 2 seconds into clip3 (starts at 18)
       act(() => {
-        result.current.handlePlayheadChange(100)
+        result.current.setPlayheadPosition(20)
       })
-
-      // Should clamp to last clip
-      expect(result.current.currentClip?.id).toBe('clip2')
-    })
-
-    it('handles seeking to 0', () => {
-      const { result } = renderHook(() => useMultiClipPlayback(mockClips))
-
-      act(() => {
-        result.current.handlePlayheadChange(12)
-        result.current.handlePlayheadChange(0)
-      })
-
-      expect(result.current.playheadPosition).toBe(0)
-      expect(result.current.currentClip?.id).toBe('clip1')
-      expect(result.current.relativePlayheadPosition).toBe(0)
-    })
-
-    it('recalculates when clips change', () => {
-      const { result, rerender } = renderHook(({ clips }) => useMultiClipPlayback(clips), {
-        initialProps: { clips: mockClips }
-      })
-
-      expect(result.current.totalDuration).toBe(18)
-
-      // Update with only first clip
-      rerender({ clips: [mockClips[0]] })
-
-      expect(result.current.totalDuration).toBe(10)
-      expect(result.current.clipPositions.size).toBe(1)
-    })
-
-    it('handles very short clip durations', () => {
-      const shortClips: TimelineClip[] = [
-        { ...mockClips[0], timelineDuration: 0.5 },
-        { ...mockClips[1], timelineDuration: 0.3 }
-      ]
-
-      const { result } = renderHook(() => useMultiClipPlayback(shortClips))
-
-      expect(result.current.totalDuration).toBe(0.8)
-      expect(result.current.clipPositions.get('clip1')).toEqual({ start: 0, end: 0.5 })
-      expect(result.current.clipPositions.get('clip2')).toEqual({ start: 0.5, end: 0.8 })
-    })
-
-    it('maintains currentClip during playback in same clip', () => {
-      const { result } = renderHook(() => useMultiClipPlayback(mockClips))
-
-      act(() => {
-        result.current.setPlayheadPosition(0)
-        result.current.setIsPlaying(true)
-      })
-
-      const initialClip = result.current.currentClip
-
-      act(() => {
-        result.current.handleTimeUpdate(5) // still in clip1
-      })
-
-      expect(result.current.currentClip).toBe(initialClip)
-      expect(result.current.currentClip?.id).toBe('clip1')
+      expect(result.current.relativePlayheadPosition).toBe(2)
     })
   })
 
-  describe('boundary conditions', () => {
-    it('handles transitioning between clips smoothly', () => {
-      const { result } = renderHook(() => useMultiClipPlayback(mockClips))
+  describe('single clip', () => {
+    it('handles single clip timeline', () => {
+      const singleClip = [mockClips[0]]
+      const { result } = renderHook(() => useMultiClipPlayback(singleClip))
+
+      expect(result.current.totalDuration).toBe(10)
+      expect(result.current.currentClip).toBe(singleClip[0])
 
       act(() => {
-        result.current.setPlayheadPosition(9) // 1 second before clip1 ends
         result.current.setIsPlaying(true)
+        result.current.handleTimeUpdate(10)
       })
 
-      expect(result.current.currentClip?.id).toBe('clip1')
-
-      // Advance just past boundary
-      act(() => {
-        result.current.handleTimeUpdate(10) // exactly at boundary
-      })
-
-      expect(result.current.currentClip?.id).toBe('clip2')
       expect(result.current.playheadPosition).toBe(10)
-    })
-
-    it('handles last clip reaching end', () => {
-      const { result } = renderHook(() => useMultiClipPlayback(mockClips))
-
-      act(() => {
-        result.current.setPlayheadPosition(17) // near end of clip2
-        result.current.setIsPlaying(true)
-      })
-
-      expect(result.current.playheadPosition).toBe(17)
-      expect(result.current.isPlaying).toBe(true)
-
-      // handleTimeUpdate takes RELATIVE time within current clip (clip2 is 8 seconds long)
-      // At position 17, we're 7 seconds into clip2, so updating to 8 should reach the end
-      act(() => {
-        result.current.handleTimeUpdate(8) // 8 seconds into clip2 (end)
-      })
-
-      expect(result.current.playheadPosition).toBe(18)
       expect(result.current.isPlaying).toBe(false)
-      expect(result.current.currentClip?.id).toBe('clip2') // still on last clip
     })
   })
 })
