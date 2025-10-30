@@ -1,9 +1,12 @@
-import { TimelineClip } from '../types/timeline'
+import { TimelineClip, PiPConfig } from '../types/timeline'
 import { useEffect, useState } from 'react'
+import { formatDuration } from '../utils/timeUtils'
 
 interface InfoPanelProps {
   currentClip: TimelineClip | undefined
   totalClips: number
+  pipConfig: PiPConfig
+  onPipConfigChange: (config: PiPConfig) => void
   onExport: () => Promise<void>
   onDeleteClip: () => void
   onSavePermanently: () => Promise<void>
@@ -12,6 +15,8 @@ interface InfoPanelProps {
 function InfoPanel({
   currentClip,
   totalClips,
+  pipConfig,
+  onPipConfigChange,
   onExport,
   onDeleteClip,
   onSavePermanently
@@ -45,14 +50,54 @@ function InfoPanel({
               <strong>Resolution:</strong> {currentClip.metadata.resolution}
             </div>
             <div className="info-item">
-              <strong>Duration:</strong> {Math.floor(currentClip.sourceDuration)}s
+              <strong>Duration:</strong> {formatDuration(currentClip.sourceDuration)}
             </div>
             <div className="info-item">
-              <strong>Trim:</strong> {Math.floor(currentClip.sourceStartTime)}s -{' '}
-              {Math.floor(currentClip.sourceStartTime + currentClip.timelineDuration)}s
+              <strong>Trim:</strong> {formatDuration(currentClip.sourceStartTime)} -{' '}
+              {formatDuration(currentClip.sourceStartTime + currentClip.timelineDuration)}
+            </div>
+            <div className="info-item">
+              <strong>Track:</strong> {currentClip.trackIndex === 0 ? 'Main' : 'PiP'}
             </div>
           </>
         )}
+
+        <hr style={{ margin: '16px 0', border: '1px solid #444' }} />
+
+        <h3>PiP Settings</h3>
+        <div className="info-item">
+          <label>
+            <strong>Position:</strong>
+          </label>
+          <select
+            value={pipConfig.position}
+            onChange={(e) =>
+              onPipConfigChange({ ...pipConfig, position: e.target.value as PiPConfig['position'] })
+            }
+            style={{ marginLeft: '8px', padding: '4px' }}
+          >
+            <option value="bottom-right">Bottom Right</option>
+            <option value="bottom-left">Bottom Left</option>
+            <option value="top-right">Top Right</option>
+            <option value="top-left">Top Left</option>
+          </select>
+        </div>
+        <div className="info-item">
+          <label>
+            <strong>Size:</strong>
+          </label>
+          <select
+            value={pipConfig.size}
+            onChange={(e) =>
+              onPipConfigChange({ ...pipConfig, size: e.target.value as PiPConfig['size'] })
+            }
+            style={{ marginLeft: '8px', padding: '4px' }}
+          >
+            <option value="small">Small (15%)</option>
+            <option value="medium">Medium (25%)</option>
+            <option value="large">Large (40%)</option>
+          </select>
+        </div>
       </div>
 
       <div className="button-group">

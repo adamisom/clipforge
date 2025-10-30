@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from 'react'
-import { TimelineClip } from '../types/timeline'
+import { useCallback, useEffect, useState, useMemo } from 'react'
+import { TimelineClip, PiPConfig, DEFAULT_PIP_CONFIG } from '../types/timeline'
 import Timeline from './Timeline'
 import VideoPreview from './VideoPreview'
 import InfoPanel from './InfoPanel'
 import { generateClipId } from '../utils/clipUtils'
 import { useMultiClipPlayback } from '../hooks/useMultiClipPlayback'
+import { getCurrentClip, calculateClipPositions } from '../utils/clipUtils'
 
 interface VideoEditorProps {
   clips: TimelineClip[]
@@ -38,6 +39,16 @@ function VideoEditor({
   } = useMultiClipPlayback(clips)
 
   const [wasPlayingBeforeDrag, setWasPlayingBeforeDrag] = useState(false)
+  const [pipConfig, setPipConfig] = useState<PiPConfig>(DEFAULT_PIP_CONFIG)
+
+  // Calculate current PiP clip (Track 1) at playhead position
+  const currentPipClip = useMemo(() => {
+    const track1Clips = clips.filter((c) => c.trackIndex === 1)
+    if (track1Clips.length === 0) return null
+
+    const track1Positions = calculateClipPositions(track1Clips)
+    return getCurrentClip(track1Clips, track1Positions, playheadPosition) || null
+  }, [clips, playheadPosition])
 
   const handlePlayheadDragStart = useCallback(() => {
     setWasPlayingBeforeDrag(isPlaying)
@@ -275,6 +286,8 @@ function VideoEditor({
             trimEnd={currentClip.sourceStartTime + currentClip.timelineDuration}
             playheadPosition={relativePlayheadPosition}
             isPlaying={isPlaying}
+            pipClip={currentPipClip}
+            pipConfig={pipConfig}
             onPlayPause={togglePlayPause}
             onTimeUpdate={handleTimeUpdate}
           />
@@ -300,6 +313,8 @@ function VideoEditor({
       <InfoPanel
         currentClip={currentClip}
         totalClips={clips.length}
+        pipConfig={pipConfig}
+        onPipConfigChange={setPipConfig}
         onExport={handleExport}
         onDeleteClip={handleDeleteClip}
         onSavePermanently={handleSavePermanently}

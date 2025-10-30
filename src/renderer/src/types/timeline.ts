@@ -12,3 +12,13 @@ export interface TimelineClip {
     codec: string
   }
 }
+
+export interface PiPConfig {
+  position: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left'
+  size: 'small' | 'medium' | 'large'
+}
+
+export const DEFAULT_PIP_CONFIG: PiPConfig = {
+  position: 'bottom-right',
+  size: 'medium'
+}
