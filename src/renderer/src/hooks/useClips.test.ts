@@ -11,6 +11,7 @@ describe('useClips', () => {
     sourceStartTime: 0,
     sourceDuration: 30,
     timelineDuration: 30,
+    trackIndex: 0,
     metadata: { filename: 'video.mp4', resolution: '1920x1080', codec: 'h264' }
   }
 
@@ -21,6 +22,7 @@ describe('useClips', () => {
     sourceStartTime: 0,
     sourceDuration: 20,
     timelineDuration: 20,
+    trackIndex: 0,
     metadata: { filename: 'recording.webm', resolution: '1280x720', codec: 'vp8' }
   }
 

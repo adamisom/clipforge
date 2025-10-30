@@ -1,6 +1,11 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { formatTime } from '../utils/videoUtils'
-import { calculateClipPositions, isTempFile } from '../utils/clipUtils'
+import {
+  calculateClipPositions,
+  isTempFile,
+  getTrack0Clips,
+  getTrack1Clips
+} from '../utils/clipUtils'
 import { TimelineClip } from '../types/timeline'
 
 interface TimelineProps {
@@ -15,6 +20,11 @@ interface TimelineProps {
   onImport: () => void
   onRecordScreen: () => void
   onRecordWebcam: () => void
+  onMoveToTrack: (clipId: string, trackIndex: 0 | 1) => void
+  isPlaying: boolean
+  onPlayPause: () => void
+  onDeleteClip: () => void
+  currentClip: TimelineClip | undefined
 }
 
 function Timeline({
@@ -28,13 +38,24 @@ function Timeline({
   onPlayheadDragEnd,
   onImport,
   onRecordScreen,
-  onRecordWebcam
+  onRecordWebcam,
+  onMoveToTrack,
+  isPlaying,
+  onPlayPause,
+  onDeleteClip,
+  currentClip
 }: TimelineProps): React.JSX.Element {
   const [isDraggingTrim, setIsDraggingTrim] = useState(false)
   const [isDraggingPlayhead, setIsDraggingPlayhead] = useState(false)
   const [dragType, setDragType] = useState<'start' | 'end' | null>(null)
   const [dragClipId, setDragClipId] = useState<string | null>(null)
   const [tempFileFlags, setTempFileFlags] = useState<Map<string, boolean>>(new Map())
+  const [contextMenu, setContextMenu] = useState<{
+    visible: boolean
+    x: number
+    y: number
+    clipId: string | null
+  }>({ visible: false, x: 0, y: 0, clipId: null })
   const timelineRef = useRef<HTMLDivElement>(null)
 
   // Check which clips are temp files
@@ -50,10 +71,31 @@ function Timeline({
     checkTempFiles()
   }, [clips])
 
-  // Calculate total duration and clip positions
-  const totalDuration = clips.reduce((sum, clip) => sum + clip.timelineDuration, 0)
+  // Calculate total duration and clip positions (per track for correct positioning)
+  const track0Clips = getTrack0Clips(clips)
+  const track1Clips = getTrack1Clips(clips)
 
-  const clipPositions = useMemo(() => calculateClipPositions(clips), [clips])
+  const track0Positions = useMemo(() => calculateClipPositions(track0Clips), [track0Clips])
+  const track1Positions = useMemo(() => calculateClipPositions(track1Clips), [track1Clips])
+
+  const totalDuration = Math.max(
+    track0Clips.reduce((sum, clip) => sum + clip.timelineDuration, 0),
+    track1Clips.reduce((sum, clip) => sum + clip.timelineDuration, 0)
+  )
+
+  // For legacy clipPositions (keep for compatibility)
+  const clipPositions = useMemo(() => {
+    const positions = new Map<string, { start: number; end: number }>()
+    track0Clips.forEach((clip) => {
+      const pos = track0Positions.get(clip.id)
+      if (pos) positions.set(clip.id, pos)
+    })
+    track1Clips.forEach((clip) => {
+      const pos = track1Positions.get(clip.id)
+      if (pos) positions.set(clip.id, pos)
+    })
+    return positions
+  }, [track0Clips, track1Clips, track0Positions, track1Positions])
 
   // Calculate pixels per second dynamically based on total duration
   const maxTimelineWidth = 1500
@@ -93,6 +135,38 @@ function Timeline({
   const handleClipClick = (clipId: string): void => {
     onClipSelect(clipId)
   }
+
+  // Handle right-click to show context menu
+  const handleClipRightClick = (e: React.MouseEvent, clipId: string): void => {
+    e.preventDefault()
+    e.stopPropagation()
+    setContextMenu({
+      visible: true,
+      x: e.clientX,
+      y: e.clientY,
+      clipId
+    })
+  }
+
+  // Handle move to track
+  const handleMoveToTrack = (trackIndex: 0 | 1): void => {
+    if (contextMenu.clipId) {
+      onMoveToTrack(contextMenu.clipId, trackIndex)
+      setContextMenu({ visible: false, x: 0, y: 0, clipId: null })
+    }
+  }
+
+  // Close context menu on click outside
+  useEffect(() => {
+    if (!contextMenu.visible) return
+
+    const handleClick = (): void => {
+      setContextMenu({ visible: false, x: 0, y: 0, clipId: null })
+    }
+
+    window.addEventListener('click', handleClick)
+    return () => window.removeEventListener('click', handleClick)
+  }, [contextMenu.visible])
 
   // Handle trim dragging
   useEffect(() => {
@@ -172,23 +246,48 @@ function Timeline({
     <div className="timeline-panel">
       {/* Timeline Toolbar */}
       <div className="timeline-toolbar">
-        <button onClick={onImport} className="timeline-toolbar-button" title="Import Video (Cmd+I)">
-          + Import
-        </button>
-        <button
-          onClick={onRecordScreen}
-          className="timeline-toolbar-button"
-          title="Record Screen (Cmd+Shift+R)"
-        >
-          🖥️
-        </button>
-        <button
-          onClick={onRecordWebcam}
-          className="timeline-toolbar-button"
-          title="Record Webcam (Cmd+Shift+W)"
-        >
-          📹
-        </button>
+        <div className="timeline-toolbar-left">
+          <button
+            onClick={onImport}
+            className="timeline-toolbar-button"
+            title="Import Video (Cmd+I)"
+          >
+            + Import
+          </button>
+          <button
+            onClick={onRecordScreen}
+            className="timeline-toolbar-button"
+            title="Record Screen (Cmd+Shift+R)"
+          >
+            🖥️
+          </button>
+          <button
+            onClick={onRecordWebcam}
+            className="timeline-toolbar-button"
+            title="Record Webcam (Cmd+Shift+W)"
+          >
+            📹
+          </button>
+        </div>
+
+        {/* Play/Pause Button - Center, Prominent */}
+        <div className="timeline-toolbar-center">
+          <button onClick={onPlayPause} className="timeline-play-button" title="Play/Pause (Space)">
+            {isPlaying ? '⏸' : '▶'}
+          </button>
+        </div>
+
+        {/* Delete Button - Right */}
+        <div className="timeline-toolbar-right">
+          <button
+            onClick={onDeleteClip}
+            disabled={!currentClip}
+            className="timeline-delete-button"
+            title="Delete selected clip (Delete key)"
+          >
+            🗑️ Delete
+          </button>
+        </div>
       </div>
 
       {/* Timeline Content Wrapper */}
@@ -218,56 +317,109 @@ function Timeline({
             ))}
           </div>
 
-          {/* Timeline Track */}
-          <div className="timeline-track">
-            {/* Render all clips */}
-            {clips.map((clip) => {
-              const clipPositionData = clipPositions.get(clip.id)
-              const clipStart = clipPositionData?.start || 0
-              const isSelected = clip.id === selectedClipId
-              const isTemp = tempFileFlags.get(clip.id) || false
+          {/* Multi-Track Timeline */}
+          <div className="timeline-tracks">
+            {/* Track 0: Main Video */}
+            <div className="timeline-track" data-track="0">
+              <div className="track-label">Main</div>
+              {track0Clips.map((clip) => {
+                const clipPositionData = track0Positions.get(clip.id)
+                const clipStart = clipPositionData?.start || 0
+                const isSelected = clip.id === selectedClipId
+                const isTemp = tempFileFlags.get(clip.id) || false
 
-              return (
-                <div
-                  key={clip.id}
-                  className={`timeline-clip ${isSelected ? 'selected' : ''} ${isTemp ? 'temp-file' : ''}`}
-                  style={{
-                    transform: `translateX(${clipStart * pixelsPerSecond}px)`,
-                    width: `${clip.timelineDuration * pixelsPerSecond}px`,
-                    top: '15px'
-                  }}
-                  onClick={() => handleClipClick(clip.id)}
-                >
-                  {isTemp && (
-                    <span className="temp-indicator" title="Unsaved recording">
-                      ⚠️
-                    </span>
-                  )}
-                  <span
-                    style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                    title={clip.metadata.filename}
+                return (
+                  <div
+                    key={clip.id}
+                    className={`timeline-clip ${isSelected ? 'selected' : ''} ${isTemp ? 'temp-file' : ''}`}
+                    style={{
+                      transform: `translateX(${clipStart * pixelsPerSecond}px)`,
+                      width: `${clip.timelineDuration * pixelsPerSecond}px`
+                    }}
+                    onClick={() => handleClipClick(clip.id)}
+                    onContextMenu={(e) => handleClipRightClick(e, clip.id)}
                   >
-                    {clip.metadata.filename}
-                  </span>
+                    {isTemp && (
+                      <span className="temp-indicator" title="Unsaved recording">
+                        ⚠️
+                      </span>
+                    )}
+                    <span
+                      style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                      title={clip.metadata.filename}
+                    >
+                      {clip.metadata.filename}
+                    </span>
 
-                  {/* Only show trim handles on selected clip */}
-                  {isSelected && (
-                    <>
-                      <div
-                        className="trim-handle trim-handle-left"
-                        onMouseDown={(e) => handleTrimDragStart(e, clip.id, 'start')}
-                      />
-                      <div
-                        className="trim-handle trim-handle-right"
-                        onMouseDown={(e) => handleTrimDragStart(e, clip.id, 'end')}
-                      />
-                    </>
-                  )}
-                </div>
-              )
-            })}
+                    {/* Only show trim handles on selected clip */}
+                    {isSelected && (
+                      <>
+                        <div
+                          className="trim-handle trim-handle-left"
+                          onMouseDown={(e) => handleTrimDragStart(e, clip.id, 'start')}
+                        />
+                        <div
+                          className="trim-handle trim-handle-right"
+                          onMouseDown={(e) => handleTrimDragStart(e, clip.id, 'end')}
+                        />
+                      </>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
 
-            {/* Playhead */}
+            {/* Track 1: PiP Overlay */}
+            <div className="timeline-track" data-track="1">
+              <div className="track-label">PiP</div>
+              {track1Clips.map((clip) => {
+                const clipPositionData = track1Positions.get(clip.id)
+                const clipStart = clipPositionData?.start || 0
+                const isSelected = clip.id === selectedClipId
+                const isTemp = tempFileFlags.get(clip.id) || false
+
+                return (
+                  <div
+                    key={clip.id}
+                    className={`timeline-clip ${isSelected ? 'selected' : ''} ${isTemp ? 'temp-file' : ''}`}
+                    style={{
+                      transform: `translateX(${clipStart * pixelsPerSecond}px)`,
+                      width: `${clip.timelineDuration * pixelsPerSecond}px`
+                    }}
+                    onClick={() => handleClipClick(clip.id)}
+                    onContextMenu={(e) => handleClipRightClick(e, clip.id)}
+                  >
+                    {isTemp && (
+                      <span className="temp-indicator" title="Unsaved recording">
+                        ⚠️
+                      </span>
+                    )}
+                    <span
+                      style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                      title={clip.metadata.filename}
+                    >
+                      {clip.metadata.filename}
+                    </span>
+
+                    {/* Only show trim handles on selected clip */}
+                    {isSelected && (
+                      <>
+                        <div
+                          className="trim-handle trim-handle-left"
+                          onMouseDown={(e) => handleTrimDragStart(e, clip.id, 'start')}
+                        />
+                        <div
+                          className="trim-handle trim-handle-right"
+                          onMouseDown={(e) => handleTrimDragStart(e, clip.id, 'end')}
+                        />
+                      </>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Playhead (spans both tracks) */}
             <div
               className="playhead"
               style={{
@@ -278,6 +430,20 @@ function Timeline({
           </div>
         </div>
       </div>
+
+      {/* Context Menu */}
+      {contextMenu.visible && (
+        <>
+          <div
+            className="context-menu-overlay"
+            onClick={() => setContextMenu({ visible: false, x: 0, y: 0, clipId: null })}
+          />
+          <div className="context-menu" style={{ left: contextMenu.x, top: contextMenu.y }}>
+            <button onClick={() => handleMoveToTrack(0)}>Move to Track 0 (Main)</button>
+            <button onClick={() => handleMoveToTrack(1)}>Move to Track 1 (PiP)</button>
+          </div>
+        </>
+      )}
     </div>
   )
 }

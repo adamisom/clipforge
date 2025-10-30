@@ -5,6 +5,9 @@ declare global {
   interface Window {
     electron: ElectronAPI
     api: {
+      // File utilities
+      getPathForFile: (file: File) => string
+
       // Invoke methods (request-response)
       selectVideoFile: () => Promise<string | null>
       resizeWindow: (width: number, height: number) => Promise<void>
@@ -30,6 +33,25 @@ declare global {
         }>,
         outputPath: string
       ) => Promise<{ success: boolean }>
+      exportMultiTrack: (
+        track0Clips: Array<{
+          id: string
+          sourcePath: string
+          sourceStartTime: number
+          timelineDuration: number
+        }>,
+        track1Clips: Array<{
+          id: string
+          sourcePath: string
+          sourceStartTime: number
+          timelineDuration: number
+        }>,
+        pipConfig: {
+          position: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left'
+          size: 'small' | 'medium' | 'large'
+        },
+        outputPath: string
+      ) => Promise<{ success: boolean }>
       selectSavePath: () => Promise<string | null>
       saveRecordingBlob: (arrayBuffer: ArrayBuffer) => Promise<string>
       saveRecordingPermanent: (tempPath: string) => Promise<{ saved: boolean; path: string }>
@@ -52,6 +74,7 @@ declare global {
       onMenuExport: (callback: (event: IpcRendererEvent) => void) => void
       onMenuRecordWebcam: (callback: (event: IpcRendererEvent) => void) => void
       onMenuRecordScreen: (callback: (event: IpcRendererEvent) => void) => void
+      onMenuRecordSimultaneous: (callback: (event: IpcRendererEvent) => void) => void
       onCheckUnsavedRecordings: (callback: () => void) => void
       respondUnsavedRecordings: (hasTempFiles: boolean) => void
       removeAllListeners: (channel: string) => void

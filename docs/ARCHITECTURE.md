@@ -2,15 +2,19 @@
 
 ## Overview
 
-ClipForge is a desktop video editor built with Electron and React. This document describes the high-level architecture, data flow, and key design decisions for the MVP and Phase 2 implementation.
+ClipForge is a desktop video editor built with Electron and React. This document describes the high-level architecture, data flow, and key design decisions for the MVP, Phase 2, and Phase 3 A-C implementations.
 
-**Current Status**: MVP + Phase 2 Complete
+**Current Status**: MVP + Phase 2 + Phase 3 A-C Complete
 - ✅ Basic video editing (import, trim, export)
-- ✅ Multi-clip timeline support
-- ✅ Screen and webcam recording
-- ✅ Split functionality
-- ✅ Drag-and-drop import
-- ✅ Temp file management
+- ✅ Multi-clip timeline support (Phase 2)
+- ✅ Screen and webcam recording (Phase 2)
+- ✅ Split functionality (Phase 2)
+- ✅ Drag-and-drop import (Phase 2)
+- ✅ Temp file management (Phase 2)
+- ✅ Multi-track timeline (Track 0 + Track 1) (Phase 3 A)
+- ✅ Simultaneous screen + webcam recording (Phase 3 B)
+- ✅ Picture-in-Picture (PiP) configuration and preview (Phase 3 C)
+- ✅ Multi-track export with FFmpeg overlay and audio mixing (Phase 3 C)
 
 ---
 
@@ -127,6 +131,68 @@ Renderer: Adds to clips[] array, displays ⚠️ if still temp
 - Screen recording uses notification + global shortcut for better UX
 - Window minimize logic skips if recording ClipForge/Electron itself
 
+### Simultaneous Recording Workflow (Phase 3 B)
+
+```
+User clicks Record → Screen + Webcam
+    ↓
+Renderer: Shows SimultaneousRecorder component
+    ↓
+Renderer: Fetches available screen sources via window.api.getScreenSources()
+    ↓
+User selects screen source
+    ↓
+Renderer: Initializes webcam stream via getUserMedia({ video: true, audio: true })
+    ↓
+User sees webcam preview → Clicks "Start Recording"
+    ↓
+Renderer: Shows 3-2-1 countdown
+    ↓
+[If not recording ClipForge/Electron] Main: Minimizes window
+    ↓
+Renderer: Captures screen stream via getUserMedia({ video, audio: false })
+    ↓
+Renderer: Two MediaRecorders record simultaneously:
+  - Screen: video only (no audio to avoid duplication)
+  - Webcam: video + microphone audio
+    ↓
+Main: Shows tray icon "🔴REC 0:XX" with timer
+    ↓
+User stops recording (Cmd+Shift+S or tray menu)
+    ↓
+Renderer: Stops both recorders, converts Blobs to ArrayBuffers
+    ↓
+Renderer: Saves both recordings to temp directory
+    ↓
+Main: Returns temp paths for both recordings
+    ↓
+Renderer: Shows save dialog for screen recording
+    ↓
+User saves screen recording permanently
+    ↓
+Renderer: Shows save dialog for webcam recording
+    ↓
+User saves webcam recording permanently
+    ↓
+Renderer: Gets metadata for both recordings
+    ↓
+Renderer: Creates two TimelineClips:
+  - Screen clip: trackIndex = 0 (Track 0 / Main)
+  - Webcam clip: trackIndex = 1 (Track 1 / PiP)
+    ↓
+Renderer: Adds both clips to clips[] array at position 0
+```
+
+**Key Points**:
+
+- Two separate MediaRecorder instances run in parallel
+- Screen recording: `audio: false` (video only)
+- Webcam recording: `audio: true` (video + microphone)
+- This prevents duplicate/echo audio in multi-track export
+- Both clips have same duration (from single recording timer)
+- Clips automatically assigned to correct tracks (screen → Track 0, webcam → Track 1)
+- Immediate save flow (not deferred like standalone recording)
+
 ### Multi-Clip Export Workflow
 
 ```
@@ -158,6 +224,59 @@ Renderer: Shows success message
 - Export automatically chooses optimal method based on trimming
 - Simple concat is much faster (no re-encoding) when no trimming
 - Complex filter handles per-clip trimming + concatenation in one pass
+
+### Multi-Track Export with PiP Overlay (Phase 3 C.4)
+
+```
+User clicks Export (with clips on Track 0 and Track 1)
+    ↓
+Renderer: Filters clips into track0Clips and track1Clips
+    ↓
+Renderer: Checks if multi-track (track1Clips.length > 0)
+    ↓
+[Multi-Track Path]
+    ↓
+Renderer: Calculates total duration for each track
+    ↓
+If duration mismatch > 0.5s: Shows warning dialog
+    ↓
+User confirms or cancels
+    ↓
+Renderer: Calls window.api.exportMultiTrack(track0Clips, track1Clips, pipConfig, outputPath)
+    ↓
+Main: Builds FFmpeg complex filter:
+  1. Add all Track 0 and Track 1 clips as inputs
+  2. Trim each clip: setpts=PTS-STARTPTS
+  3. Concatenate clips within each track (if multiple)
+  4. Scale Track 1 (PiP) based on size setting (15%, 25%, 40%)
+  5. Overlay scaled PiP onto Track 0 at position (top-left, etc.)
+  6. Mix audio from both tracks: amix=inputs=2:duration=longest
+    ↓
+Main: FFmpeg command example:
+  ffmpeg -i track0_clip1.mp4 -i track1_clip1.webm \
+    -filter_complex "\
+      [0:v]trim=0:10,setpts=PTS-STARTPTS[v0];\
+      [1:v]trim=0:10,setpts=PTS-STARTPTS[v1];\
+      [v1]scale=iw*0.25:ih*0.25[v1scaled];\
+      [v0][v1scaled]overlay=W-w-20:H-h-20[outv];\
+      [0:a][1:a]amix=inputs=2:duration=longest[outa]"\
+    -map [outv] -map [outa] output.mp4
+    ↓
+Main: Executes FFmpeg, sends progress
+    ↓
+Renderer: Updates UI, shows completion notification
+```
+
+**Key Points**:
+
+- Multi-track export uses FFmpeg `overlay` filter for PiP positioning
+- PiP size: small (15%), medium (25%), large (40%) of main video
+- PiP position: 20px padding from edges (bottom-right, top-left, etc.)
+- Audio mixing: `amix` filter combines audio from both tracks
+- Track 0 (screen) may have no audio, Track 1 (webcam) has microphone
+- No echo/duplication because screen recording disables audio in simultaneous mode
+- Export duration matches longer track (shorter track freezes/blacks out at end)
+- If Track 0 missing: Error shown (multi-track requires main track)
 
 ### Export Workflow
 
@@ -294,6 +413,7 @@ Preview updates to show frame at new position
 ### State Structure
 
 ```typescript
+// Single video state (MVP)
 interface VideoState {
   sourcePath: string | null // File path on disk
   duration: number // Full video duration (seconds)
@@ -304,6 +424,30 @@ interface VideoState {
   metadata: {
     filename: string // Extracted in main process
     resolution: string // e.g., "1920x1080"
+  }
+}
+
+// Multi-clip state (Phase 2+)
+interface TimelineClip {
+  id: string // Unique identifier (crypto.randomUUID())
+  sourcePath: string // Original video file path
+  sourceStartTime: number // Where clip starts in source (trimStart)
+  timelineDuration: number // Duration of clip on timeline (trimEnd - trimStart)
+  totalSourceDuration: number // Full source video duration
+  filename: string // Display name
+  resolution: string // e.g., "1920x1080"
+  trackIndex: 0 | 1 // Track 0 (main) or Track 1 (PiP overlay)
+}
+
+// App state
+interface AppState {
+  clips: TimelineClip[] // Array of clips on timeline (Phase 2+)
+  selectedClipId: string | null // Currently selected clip for preview/editing
+  playheadPosition: number // Absolute position across all clips
+  isPlaying: boolean // Global playback state
+  pipConfig: {
+    position: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left'
+    size: 'small' | 'medium' | 'large'
   }
 }
 ```
@@ -345,26 +489,47 @@ setVideoState((prev) => ({ ...prev, trimStart: newStart }))
 ```
 App
   ├─ WelcomeScreen (when no video)
+  │   ├─ Designated Drop Zone (with icon and instructions)
   │   ├─ Import Button
-  │   └─ Drag-and-Drop Zone
+  │   ├─ Test Webcam Button (icon)
+  │   └─ Test Screen Button (icon)
   │
   └─ VideoEditor (when video loaded)
       ├─ VideoPreview
-      │   ├─ <video> element
+      │   ├─ <video> element (main video - Track 0)
+      │   ├─ <video> element (PiP overlay - Track 1, if present)
       │   └─ Play/Pause button
       │
       ├─ Timeline
-      │   ├─ TimeRuler (shows seconds)
-      │   ├─ Playhead (vertical red line)
-      │   └─ TimelineClip
-      │       ├─ Clip visualization
-      │       ├─ Left trim handle
-      │       └─ Right trim handle
+      │   ├─ Timeline Toolbar (import/record buttons)
+      │   ├─ Track 0 (Main)
+      │   │   ├─ TimeRuler (shows seconds)
+      │   │   ├─ Playhead (draggable, with triangle handle)
+      │   │   └─ TimelineClip(s)
+      │   │       ├─ Clip visualization
+      │   │       ├─ Left trim handle
+      │   │       ├─ Right trim handle
+      │   │       ├─ Split line indicator (if split)
+      │   │       ├─ Temp file indicator (⚠️ emoji)
+      │   │       └─ Context menu (right-click)
+      │   │
+      │   └─ Track 1 (Picture-in-Picture)
+      │       └─ TimelineClip(s)
+      │           ├─ Clip visualization
+      │           ├─ Left trim handle
+      │           ├─ Right trim handle
+      │           ├─ Temp file indicator (⚠️ emoji)
+      │           └─ Context menu (right-click)
       │
-      ├─ VideoInfo
+      ├─ InfoPanel
       │   ├─ Filename display
       │   ├─ Resolution display
-      │   └─ Trim range display
+      │   ├─ Trim range display
+      │   └─ Save Permanently button (if temp file)
+      │
+      ├─ PiP Settings (if Track 1 has clips)
+      │   ├─ Position selector (bottom-right, top-left, etc.)
+      │   └─ Size selector (small, medium, large)
       │
       └─ ExportButton
 ```
@@ -372,8 +537,12 @@ App
 **Key Components**:
 
 - **TimelineClip**: Simple div with transform-based positioning for performance
-- **Playhead**: Always positioned above timeline track for visual clarity
+- **Playhead**: Draggable with triangle handle, resumes playback on release
 - **Trim handles**: Small draggable areas on clip edges (West/East)
+- **Context Menu**: Right-click on clip to move between tracks, delete, etc.
+- **PiP Preview**: Second `<video>` element overlaid on main video, synced playback
+- **Timeline Toolbar**: Import/record buttons accessible from main screen
+- **Designated Drop Zone**: Visual drop area on welcome screen with instructions
 
 ---
 
@@ -915,7 +1084,7 @@ extraResources:
 - We bundle **both** binaries separately (not symlinks)
 - Path must match the architecture: `darwin-arm64` for Apple Silicon Macs
 
-**Note**: DMG distribution is currently disabled due to `hdiutil` errors. Using `.zip` format instead. See `POST_MVP.md` for details.
+**Note**: DMG distribution is now supported (Phase 3+). Users can build either DMG or ZIP.
 
 ### Application Size
 
@@ -927,42 +1096,60 @@ extraResources:
 
 ### Distribution
 
-Build command: `npm run build:mac`
-Output: `.zip` file in `dist/` directory (DMG currently disabled)
+**Build Commands:**
+- `npm run build:mac` → Builds DMG installer (professional, drag-to-Applications UI)
+- `npm run build:mac:zip` → Builds ZIP archive (simple, smaller file)
+
+**Output:**
+- DMG: `dist/clipforge-1.0.0-arm64.dmg` (~153 MB)
+- ZIP: `dist/clipforge-1.0.0-arm64-mac.zip` (~145 MB)
+
+**DMG Features:**
+- Professional installer experience
+- Dark background (#1a1a1a)
+- 540x380 window with drag-to-Applications layout
+- Visual instructions for users
+- Standard macOS distribution format
+
+**Note**: App is unsigned. Users must right-click → Open on first launch to bypass Gatekeeper.
 
 **Testing**: Install on clean macOS (no Node.js, no dev tools) and verify all features work.
 
 ---
 
-## Future Enhancements (Post-MVP)
+## Future Enhancements (Phases 3 D-F & Phase 4)
 
-### Recording Features
+### Phase 3 Remaining (D-F)
 
-- Screen recording with desktopCapturer
-- Webcam recording
-- Simultaneous screen + webcam
+- Audio mixing controls (volume sliders for Track 0 and Track 1)
+- Timeline zoom (fit-to-view, zoom in/out)
+- Integration testing and polish
 
-### Timeline Enhancements
+### Phase 4
 
-- Multiple clips
-- Drag-and-drop to reorder
-- Split clips
-- Two-track timeline (overlays)
+- Drag-and-drop to reorder clips
+- Project save/load (persist timeline state)
+- Error handling improvements
+- Loading states and progress indicators
+- Input validation
+- Timeline performance optimizations
+- Export presets (resolution, codec options)
+- Keyboard shortcuts help panel
+- Security fix (custom protocol handler for file URLs)
+- Code signing and notarization (macOS)
 
-### Export Enhancements
+### Completed Features ✅
 
-- Resolution options (720p, 1080p, source)
-- Export presets
-- Background export (continue editing)
-
-### UI Enhancements
-
-- Keyboard shortcuts
-- Undo/redo
-- Timeline zoom
-- Snap-to-grid
+- ✅ Screen recording with desktopCapturer (Phase 2)
+- ✅ Webcam recording (Phase 2)
+- ✅ Simultaneous screen + webcam (Phase 3 B)
+- ✅ Multiple clips (Phase 2)
+- ✅ Split clips (Phase 2)
+- ✅ Two-track timeline (overlays) (Phase 3 A)
+- ✅ Multi-track export with PiP (Phase 3 C)
+- ✅ DMG distribution (Phase 3 off-script)
 
 ---
 
-**Last Updated**: October 29, 2025
-**Version**: MVP v1.0 (Complete)
+**Last Updated**: October 30, 2025  
+**Version**: MVP + Phase 2 + Phase 3 A-C Complete

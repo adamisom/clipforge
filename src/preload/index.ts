@@ -1,8 +1,11 @@
-import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron'
+import { contextBridge, ipcRenderer, IpcRendererEvent, webUtils } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 
 // Custom APIs for renderer
 const api = {
+  // File utilities
+  getPathForFile: (file: File) => webUtils.getPathForFile(file),
+
   // Invoke methods (request-response)
   selectVideoFile: () => ipcRenderer.invoke('select-video-file'),
   resizeWindow: (width: number, height: number) =>
@@ -12,6 +15,12 @@ const api = {
     ipcRenderer.invoke('export-video', { sourcePath, outputPath, trimStart, duration }),
   exportMultiClip: (clips: unknown[], outputPath: string) =>
     ipcRenderer.invoke('export-multi-clip', clips, outputPath),
+  exportMultiTrack: (
+    track0Clips: unknown[],
+    track1Clips: unknown[],
+    pipConfig: unknown,
+    outputPath: string
+  ) => ipcRenderer.invoke('export-multi-track', track0Clips, track1Clips, pipConfig, outputPath),
   selectSavePath: () => ipcRenderer.invoke('select-save-path'),
   saveRecordingBlob: (arrayBuffer: ArrayBuffer) =>
     ipcRenderer.invoke('save-recording-blob', arrayBuffer),
@@ -39,6 +48,8 @@ const api = {
     ipcRenderer.on('menu-record-webcam', callback),
   onMenuRecordScreen: (callback: (event: IpcRendererEvent) => void) =>
     ipcRenderer.on('menu-record-screen', callback),
+  onMenuRecordSimultaneous: (callback: (event: IpcRendererEvent) => void) =>
+    ipcRenderer.on('menu-record-simultaneous', callback),
   onCheckUnsavedRecordings: (callback: () => void) =>
     ipcRenderer.on('check-unsaved-recordings', callback),
   respondUnsavedRecordings: (hasTempFiles: boolean) =>

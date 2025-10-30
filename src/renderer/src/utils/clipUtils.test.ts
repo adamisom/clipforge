@@ -5,7 +5,10 @@ import {
   getCurrentClip,
   getRelativePlayheadPosition,
   getTotalDuration,
-  createClipFromMetadata
+  createClipFromMetadata,
+  getTrackClips,
+  getTrack0Clips,
+  getTrack1Clips
 } from './clipUtils'
 import { TimelineClip } from '../types/timeline'
 
@@ -18,6 +21,7 @@ describe('clipUtils', () => {
       sourceStartTime: 0,
       sourceDuration: 30,
       timelineDuration: 10,
+      trackIndex: 0,
       metadata: { filename: 'video1.mp4', resolution: '1920x1080', codec: 'h264' }
     },
     {
@@ -27,6 +31,7 @@ describe('clipUtils', () => {
       sourceStartTime: 5,
       sourceDuration: 20,
       timelineDuration: 8,
+      trackIndex: 0,
       metadata: { filename: 'recording.webm', resolution: '1280x720', codec: 'vp8' }
     },
     {
@@ -36,6 +41,7 @@ describe('clipUtils', () => {
       sourceStartTime: 0,
       sourceDuration: 15,
       timelineDuration: 15,
+      trackIndex: 0,
       metadata: { filename: 'video3.mp4', resolution: '640x480', codec: 'h264' }
     }
   ]
@@ -283,6 +289,21 @@ describe('clipUtils', () => {
       expect(clip.id).toMatch(/^clip-/)
     })
 
+    it('assigns imported clips to Track 0', () => {
+      const clip = createClipFromMetadata('imported', '/path/to/video.mp4', metadata)
+      expect(clip.trackIndex).toBe(0)
+    })
+
+    it('assigns screen clips to Track 0', () => {
+      const clip = createClipFromMetadata('screen', '/tmp/screen.webm', metadata)
+      expect(clip.trackIndex).toBe(0)
+    })
+
+    it('assigns webcam clips to Track 1', () => {
+      const clip = createClipFromMetadata('webcam', '/tmp/webcam.webm', metadata)
+      expect(clip.trackIndex).toBe(1)
+    })
+
     it('uses duration override for recordings', () => {
       const clip = createClipFromMetadata('webcam', '/path/to/recording.webm', metadata, 45)
 
@@ -329,6 +350,135 @@ describe('clipUtils', () => {
       const clip = createClipFromMetadata('imported', '/video.mp4', metadata)
 
       expect(clip.sourceStartTime).toBe(0)
+    })
+  })
+
+  describe('Track filtering utilities', () => {
+    const mixedTrackClips: TimelineClip[] = [
+      {
+        id: 'main1',
+        sourceType: 'imported',
+        sourcePath: '/video1.mp4',
+        sourceStartTime: 0,
+        sourceDuration: 30,
+        timelineDuration: 10,
+        trackIndex: 0,
+        metadata: { filename: 'video1.mp4', resolution: '1920x1080', codec: 'h264' }
+      },
+      {
+        id: 'pip1',
+        sourceType: 'webcam',
+        sourcePath: '/webcam1.webm',
+        sourceStartTime: 0,
+        sourceDuration: 20,
+        timelineDuration: 10,
+        trackIndex: 1,
+        metadata: { filename: 'webcam1.webm', resolution: '640x480', codec: 'vp8' }
+      },
+      {
+        id: 'main2',
+        sourceType: 'screen',
+        sourcePath: '/screen.webm',
+        sourceStartTime: 0,
+        sourceDuration: 15,
+        timelineDuration: 8,
+        trackIndex: 0,
+        metadata: { filename: 'screen.webm', resolution: '1920x1080', codec: 'vp8' }
+      },
+      {
+        id: 'pip2',
+        sourceType: 'webcam',
+        sourcePath: '/webcam2.webm',
+        sourceStartTime: 0,
+        sourceDuration: 12,
+        timelineDuration: 6,
+        trackIndex: 1,
+        metadata: { filename: 'webcam2.webm', resolution: '640x480', codec: 'vp8' }
+      }
+    ]
+
+    describe('getTrackClips', () => {
+      it('returns only Track 0 clips', () => {
+        const track0 = getTrackClips(mixedTrackClips, 0)
+
+        expect(track0).toHaveLength(2)
+        expect(track0[0].id).toBe('main1')
+        expect(track0[1].id).toBe('main2')
+        expect(track0.every((c) => c.trackIndex === 0)).toBe(true)
+      })
+
+      it('returns only Track 1 clips', () => {
+        const track1 = getTrackClips(mixedTrackClips, 1)
+
+        expect(track1).toHaveLength(2)
+        expect(track1[0].id).toBe('pip1')
+        expect(track1[1].id).toBe('pip2')
+        expect(track1.every((c) => c.trackIndex === 1)).toBe(true)
+      })
+
+      it('handles empty array', () => {
+        expect(getTrackClips([], 0)).toEqual([])
+        expect(getTrackClips([], 1)).toEqual([])
+      })
+
+      it('returns empty when no clips on track', () => {
+        const track0Only = mixedTrackClips.filter((c) => c.trackIndex === 0)
+
+        expect(getTrackClips(track0Only, 1)).toEqual([])
+      })
+
+      it('handles all clips on same track', () => {
+        const allTrack0 = mixedTrackClips.map((c) => ({ ...c, trackIndex: 0 as 0 | 1 }))
+
+        expect(getTrackClips(allTrack0, 0)).toHaveLength(4)
+        expect(getTrackClips(allTrack0, 1)).toEqual([])
+      })
+    })
+
+    describe('getTrack0Clips', () => {
+      it('returns only main track clips', () => {
+        const track0 = getTrack0Clips(mixedTrackClips)
+
+        expect(track0).toHaveLength(2)
+        expect(track0.every((c) => c.trackIndex === 0)).toBe(true)
+      })
+
+      it('handles empty array', () => {
+        expect(getTrack0Clips([])).toEqual([])
+      })
+
+      it('preserves order', () => {
+        const track0 = getTrack0Clips(mixedTrackClips)
+
+        expect(track0[0].id).toBe('main1')
+        expect(track0[1].id).toBe('main2')
+      })
+    })
+
+    describe('getTrack1Clips', () => {
+      it('returns only PiP track clips', () => {
+        const track1 = getTrack1Clips(mixedTrackClips)
+
+        expect(track1).toHaveLength(2)
+        expect(track1.every((c) => c.trackIndex === 1)).toBe(true)
+      })
+
+      it('handles empty array', () => {
+        expect(getTrack1Clips([])).toEqual([])
+      })
+
+      it('preserves order', () => {
+        const track1 = getTrack1Clips(mixedTrackClips)
+
+        expect(track1[0].id).toBe('pip1')
+        expect(track1[1].id).toBe('pip2')
+      })
+
+      it('returns empty for Track 0 only clips', () => {
+        const track0Only = mixedTrackClips.filter((c) => c.trackIndex === 0)
+
+        expect(getTrack1Clips(track0Only)).toEqual([])
+      })
     })
   })
 })

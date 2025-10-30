@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
-import { TimelineClip } from '../types/timeline'
+import { TimelineClip, PiPConfig, DEFAULT_PIP_CONFIG } from '../types/timeline'
 import Timeline from './Timeline'
 import VideoPreview from './VideoPreview'
 import InfoPanel from './InfoPanel'
-import { generateClipId } from '../utils/clipUtils'
 import { useMultiClipPlayback } from '../hooks/useMultiClipPlayback'
+import { useClipOperations } from '../hooks/useClipOperations'
+import { usePiPClip } from '../hooks/usePiPClip'
+import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 
 interface VideoEditorProps {
   clips: TimelineClip[]
@@ -38,6 +40,29 @@ function VideoEditor({
   } = useMultiClipPlayback(clips)
 
   const [wasPlayingBeforeDrag, setWasPlayingBeforeDrag] = useState(false)
+  const [pipConfig, setPipConfig] = useState<PiPConfig>(DEFAULT_PIP_CONFIG)
+
+  // Calculate current PiP clip (Track 1) at playhead position
+  const currentPipClip = usePiPClip(clips, playheadPosition)
+
+  // Clip operations (split, delete, trim, move to track, save)
+  const {
+    handleMoveToTrack,
+    handleTrimChange,
+    handleSplitAtPlayhead,
+    handleDeleteClip,
+    handleSavePermanently
+  } = useClipOperations({
+    clips,
+    setClips,
+    selectedClipId,
+    setSelectedClipId,
+    currentClip,
+    playheadPosition,
+    isPlaying,
+    pause,
+    handlePlayheadChange
+  })
 
   const handlePlayheadDragStart = useCallback(() => {
     setWasPlayingBeforeDrag(isPlaying)
@@ -59,143 +84,12 @@ function VideoEditor({
     [setSelectedClipId]
   )
 
-  const handleTrimChange = useCallback(
-    (clipId: string, newTrimStart: number, newTrimEnd: number) => {
-      setClips((prevClips) =>
-        prevClips.map((clip) =>
-          clip.id === clipId
-            ? {
-                ...clip,
-                sourceStartTime: newTrimStart,
-                timelineDuration: newTrimEnd - newTrimStart
-              }
-            : clip
-        )
-      )
-    },
-    [setClips]
-  )
-
-  const handleSplitAtPlayhead = useCallback((): void => {
-    if (!currentClip) return
-
-    const clipPositions = new Map<string, { start: number; end: number }>()
-    let pos = 0
-    for (const clip of clips) {
-      clipPositions.set(clip.id, { start: pos, end: pos + clip.timelineDuration })
-      pos += clip.timelineDuration
-    }
-
-    const position = clipPositions.get(currentClip.id)
-    if (!position) return
-
-    const relativePos = playheadPosition - position.start
-
-    // Calculate split point relative to the clip's source video
-    const splitPoint = relativePos + currentClip.sourceStartTime
-
-    // Don't split if we're at the very beginning or end of the clip
-    if (relativePos < 0.1 || relativePos > currentClip.timelineDuration - 0.1) {
-      return
-    }
-
-    // Create two new clips from the split
-    const firstClip: TimelineClip = {
-      ...currentClip,
-      id: generateClipId(),
-      timelineDuration: relativePos
-    }
-
-    const secondClip: TimelineClip = {
-      ...currentClip,
-      id: generateClipId(),
-      sourceStartTime: splitPoint,
-      timelineDuration: currentClip.timelineDuration - relativePos
-    }
-
-    // Replace the original clip with the two new clips
-    setClips((prevClips) => {
-      const index = prevClips.findIndex((c) => c.id === currentClip.id)
-      if (index === -1) return prevClips
-      const newClips = [...prevClips]
-      newClips.splice(index, 1, firstClip, secondClip)
-      return newClips
-    })
-  }, [currentClip, clips, playheadPosition, setClips])
-
-  const handleDeleteClip = useCallback((): void => {
-    if (!selectedClipId) return
-
-    // Confirm deletion
-    const clipToDelete = clips.find((c) => c.id === selectedClipId)
-    if (!clipToDelete) return
-
-    const confirmed = window.confirm(
-      `Delete "${clipToDelete.metadata.filename}"?\n\nThis cannot be undone.`
-    )
-    if (!confirmed) return
-
-    // Pause playback if playing
-    if (isPlaying) {
-      pause()
-    }
-
-    // Find adjacent clip to select
-    const index = clips.findIndex((c) => c.id === selectedClipId)
-    const nextClip = clips[index + 1] || clips[index - 1] || null
-
-    // Delete clip
-    setClips((prevClips) => prevClips.filter((c) => c.id !== selectedClipId))
-
-    // Update selection
-    setSelectedClipId(nextClip?.id || null)
-
-    // Reset playhead to start if needed
-    const newTotalDuration = clips
-      .filter((c) => c.id !== selectedClipId)
-      .reduce((sum, c) => sum + c.timelineDuration, 0)
-
-    if (playheadPosition > newTotalDuration) {
-      handlePlayheadChange(0)
-    }
-  }, [
-    selectedClipId,
-    clips,
-    isPlaying,
-    pause,
-    setClips,
-    setSelectedClipId,
-    playheadPosition,
-    handlePlayheadChange
-  ])
-
-  // Listen for keyboard shortcuts: Cmd+K (split), Delete/Backspace (delete), Spacebar (play/pause)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent): void => {
-      // Ignore if typing in an input field
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
-        return
-      }
-
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault()
-        handleSplitAtPlayhead()
-      } else if (e.key === 'Delete' || e.key === 'Backspace') {
-        e.preventDefault()
-        handleDeleteClip()
-      } else if (e.key === ' ' || e.code === 'Space') {
-        // Spacebar for play/pause
-        e.preventDefault()
-        togglePlayPause()
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [handleSplitAtPlayhead, handleDeleteClip, togglePlayPause])
+  // Keyboard shortcuts
+  useKeyboardShortcuts({
+    onSplit: handleSplitAtPlayhead,
+    onDelete: handleDeleteClip,
+    onPlayPause: togglePlayPause
+  })
 
   const handleExport = useCallback(async (): Promise<void> => {
     if (clips.length === 0) return
@@ -203,42 +97,51 @@ function VideoEditor({
     const outputPath = await window.api.selectSavePath()
     if (!outputPath) return
 
-    if (clips.length === 1) {
-      // Single clip export (simple trim)
-      await window.api.exportVideo(
-        clips[0].sourcePath,
-        outputPath,
-        clips[0].sourceStartTime,
-        clips[0].timelineDuration
-      )
+    // Separate clips by track
+    const track0Clips = clips.filter((c) => c.trackIndex === 0)
+    const track1Clips = clips.filter((c) => c.trackIndex === 1)
+
+    // Check if we have multi-track (Track 1 has clips)
+    const hasMultiTrack = track1Clips.length > 0
+
+    if (hasMultiTrack) {
+      // Multi-track export with PiP overlay
+      if (track0Clips.length === 0) {
+        alert('Multi-track export requires at least one clip on Track 0 (Main)')
+        return
+      }
+
+      // Optional: Warn if track durations don't match
+      const track0Duration = track0Clips.reduce((sum, c) => sum + c.timelineDuration, 0)
+      const track1Duration = track1Clips.reduce((sum, c) => sum + c.timelineDuration, 0)
+
+      if (Math.abs(track0Duration - track1Duration) > 0.5) {
+        const confirmed = window.confirm(
+          `Track duration mismatch detected:\n\n` +
+            `Track 0 (Main): ${track0Duration.toFixed(1)}s\n` +
+            `Track 1 (PiP): ${track1Duration.toFixed(1)}s\n\n` +
+            `The shorter track will be padded with black. Continue?`
+        )
+        if (!confirmed) return
+      }
+
+      await window.api.exportMultiTrack(track0Clips, track1Clips, pipConfig, outputPath)
     } else {
-      // Multi-clip export (concatenate)
-      await window.api.exportMultiClip(clips, outputPath)
+      // Single-track export (existing logic)
+      if (clips.length === 1) {
+        // Single clip export (simple trim)
+        await window.api.exportVideo(
+          clips[0].sourcePath,
+          outputPath,
+          clips[0].sourceStartTime,
+          clips[0].timelineDuration
+        )
+      } else {
+        // Multi-clip export (concatenate)
+        await window.api.exportMultiClip(clips, outputPath)
+      }
     }
-  }, [clips])
-
-  const handleSavePermanently = useCallback(async (): Promise<void> => {
-    if (!selectedClipId) return
-
-    const clip = clips.find((c) => c.id === selectedClipId)
-    if (!clip) return
-
-    const isTemp = await window.api.isTempFile(clip.sourcePath)
-    if (!isTemp) return
-
-    try {
-      const result = await window.api.saveRecordingPermanent(clip.sourcePath)
-      const newPath = result.path
-
-      // Update clip with new permanent path
-      setClips((prevClips) =>
-        prevClips.map((c) => (c.id === selectedClipId ? { ...c, sourcePath: newPath } : c))
-      )
-    } catch (error) {
-      console.error('Failed to save permanently:', error)
-      alert(`Failed to save: ${error}`)
-    }
-  }, [selectedClipId, clips, setClips])
+  }, [clips, pipConfig])
 
   // Listen for menu events
   useEffect(() => {
@@ -266,7 +169,8 @@ function VideoEditor({
             trimEnd={currentClip.sourceStartTime + currentClip.timelineDuration}
             playheadPosition={relativePlayheadPosition}
             isPlaying={isPlaying}
-            onPlayPause={togglePlayPause}
+            pipClip={currentPipClip}
+            pipConfig={pipConfig}
             onTimeUpdate={handleTimeUpdate}
           />
         ) : null}
@@ -285,13 +189,19 @@ function VideoEditor({
         onImport={onImport}
         onRecordScreen={onRecordScreen}
         onRecordWebcam={onRecordWebcam}
+        onMoveToTrack={handleMoveToTrack}
+        isPlaying={isPlaying}
+        onPlayPause={togglePlayPause}
+        onDeleteClip={handleDeleteClip}
+        currentClip={currentClip}
       />
 
       <InfoPanel
         currentClip={currentClip}
         totalClips={clips.length}
+        pipConfig={pipConfig}
+        onPipConfigChange={setPipConfig}
         onExport={handleExport}
-        onDeleteClip={handleDeleteClip}
         onSavePermanently={handleSavePermanently}
       />
     </div>

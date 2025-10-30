@@ -1,7 +1,7 @@
 # ClipForge Manual Testing Guide
 
-**Version:** MVP + Phase 2 (Multi-Clip, Recording, Split)  
-**Last Updated:** October 29, 2025
+**Version:** MVP + Phase 2 + Phase 3 A-C (Multi-Track, Simultaneous Recording, PiP, Export)  
+**Last Updated:** October 30, 2025
 
 ## ⚡ TLDR Smoke Test (3 minutes)
 
@@ -640,6 +640,286 @@
 - [ ] Keyboard shortcuts work (Ctrl+O, etc.)
 - [ ] File picker is native Windows dialog
 - [ ] Export creates valid video
+
+---
+
+## 🎬 Phase 3 A-C: Multi-Track, Simultaneous Recording, PiP Export (30 minutes)
+
+**Purpose:** Verify multi-track timeline, simultaneous recording, PiP preview, and multi-track export
+
+### Test 1: Multi-Track Timeline UI
+
+**Goal:** Verify Track 0 and Track 1 display and clip management
+
+**Steps:**
+1. Launch app and import a video
+2. Verify clip appears on **Track 0 (Main)**
+3. Right-click clip → Select "Move to Track 1"
+4. Verify clip moves to **Track 1 (Picture-in-Picture)**
+5. Import another video
+6. Verify it appears on **Track 0**
+7. Right-click Track 1 clip → "Move to Track 0"
+8. Verify both clips now on Track 0
+
+**Expected:**
+- [ ] Track 0 and Track 1 labels visible
+- [ ] Clips display in correct track rows
+- [ ] Context menu shows track options
+- [ ] Clips move smoothly between tracks
+- [ ] Selection works on both tracks
+
+---
+
+### Test 2: Simultaneous Screen + Webcam Recording
+
+**Goal:** Verify simultaneous recording creates clips on both tracks
+
+**Steps:**
+1. Menu Bar → Record → Screen + Webcam
+2. Select a screen/window source (e.g., Chrome, Full Screen)
+3. Verify webcam preview appears → Click "Start Recording"
+4. Confirm minimize dialog (if recording full screen/other window)
+5. App minimizes (or stays open if recording itself)
+6. Record for **10-15 seconds**
+7. Look for menu bar tray icon "🔴REC 0:XX" → Click "Stop Recording"
+8. Or use **Cmd+Shift+S** shortcut to stop
+9. Verify notification: "Recording saved"
+10. App restores → Save dialog appears
+11. Save recordings
+
+**Expected:**
+- [ ] Two clips added to timeline:
+  - **Track 0:** Screen recording (no audio)
+  - **Track 1:** Webcam recording (with microphone audio)
+- [ ] Both clips have same duration (from timer)
+- [ ] Clips start at position 0 on timeline
+- [ ] Clips appear with ⚠️ emoji (temp files)
+- [ ] Tray icon disappears after stop
+
+---
+
+### Test 3: PiP Configuration
+
+**Goal:** Verify PiP settings panel and preview updates
+
+**Pre-requisite:** Have clips on both Track 0 and Track 1
+
+**Steps:**
+1. Verify **PiP Settings** panel appears (below Info Panel)
+2. Change **Position:**
+   - Bottom-Right → Top-Right → Bottom-Left → Top-Left
+3. Verify preview updates immediately for each change
+4. Change **Size:**
+   - Small → Medium → Large
+5. Verify PiP overlay scales in preview
+
+**Expected:**
+- [ ] PiP Settings panel visible when Track 1 has clips
+- [ ] Preview shows Track 1 video as overlay on Track 0
+- [ ] Position changes move overlay to correct corner
+- [ ] Size changes scale overlay (15%, 25%, 40%)
+- [ ] Both videos stay in sync during playback
+
+---
+
+### Test 4: PiP Preview Playback
+
+**Goal:** Verify dual video playback with PiP overlay
+
+**Pre-requisite:** Clips on Track 0 and Track 1, same start position
+
+**Steps:**
+1. Set playhead to 0
+2. Press **Play** (or Spacebar)
+3. Observe main preview area
+4. Observe PiP overlay
+5. Scrub playhead to different positions
+6. Resume playback
+
+**Expected:**
+- [ ] **Track 0 video** plays in main preview area
+- [ ] **Track 1 video** plays as PiP overlay
+- [ ] Both videos sync perfectly (same frame at same time)
+- [ ] PiP position/size matches settings
+- [ ] PiP overlay has border/shadow for visibility
+- [ ] Only one audio track plays (from Track 1 webcam)
+- [ ] Scrubbing updates both videos in sync
+
+**Known Limitation:**
+- PiP video may have slight sync drift after ~30+ seconds (browser `<video>` element limitation)
+- This does NOT affect export quality (FFmpeg handles perfect sync)
+
+---
+
+### Test 5: Multi-Track Export with PiP Overlay
+
+**Goal:** Verify FFmpeg correctly overlays Track 1 onto Track 0 with audio mixing
+
+**Pre-requisite:** Clips on both tracks
+
+**Steps:**
+1. Set PiP Settings: Position = Bottom-Right, Size = Medium
+2. Click **Export** button
+3. If track durations differ by >0.5s:
+   - ✅ Verify warning dialog appears
+   - ✅ Shows Track 0 and Track 1 durations
+   - Choose "Continue" or "Cancel"
+4. Choose export location
+5. Wait for export progress (may take 10-30 seconds)
+6. Verify notification: "Export complete"
+7. **Open exported video in QuickTime/VLC**
+
+**Expected:**
+- [ ] Track 0 video fills entire frame
+- [ ] Track 1 video appears as PiP overlay at bottom-right
+- [ ] PiP size is ~25% of frame (medium)
+- [ ] PiP has 20px padding from edges
+- [ ] Audio plays (microphone from Track 1 webcam)
+- [ ] **No audio echo or duplication**
+- [ ] Both videos perfectly in sync throughout
+- [ ] Export duration matches longer track
+- [ ] If Track 0 longer: PiP disappears when Track 1 ends
+- [ ] If Track 1 longer: Main video freezes/black when Track 0 ends
+
+---
+
+### Test 6: Microphone Audio Capture (Standalone vs. Simultaneous)
+
+**Goal:** Verify audio capture works correctly and no duplicate audio in simultaneous mode
+
+**Test 6a: Standalone Screen Recording**
+
+**Steps:**
+1. Menu Bar → Record → Screen
+2. Select source → Record 5 seconds → Stop → Save
+3. Play clip in ClipForge
+4. Export clip
+5. Open exported video → **Verify audio plays** (microphone)
+
+**Test 6b: Standalone Webcam Recording**
+
+**Steps:**
+1. Menu Bar → Record → Webcam
+2. Record 5 seconds while talking → Stop → Save
+3. Play clip in ClipForge
+4. Export clip
+5. Open exported video → **Verify audio plays** (microphone)
+
+**Test 6c: Simultaneous Recording (Audio Check)**
+
+**Steps:**
+1. Menu Bar → Record → Screen + Webcam
+2. Record 10 seconds **while talking continuously**
+3. Stop → Save both recordings
+4. **Play Track 0 clip** (screen) → ✅ **No audio** (muted)
+5. **Play Track 1 clip** (webcam) → ✅ **Audio plays** (microphone)
+6. Export multi-track video
+7. Open exported video → **Verify audio plays once (no echo)**
+
+**Expected:**
+- [ ] Standalone screen: Audio captured
+- [ ] Standalone webcam: Audio captured
+- [ ] Simultaneous: Only Track 1 (webcam) has audio
+- [ ] Simultaneous: Track 0 (screen) is silent
+- [ ] Exported multi-track: Single audio track (no duplication/echo)
+
+---
+
+### Test 7: Drag-and-Drop Improved UX
+
+**Goal:** Verify designated drop zone on welcome screen
+
+**Steps:**
+1. Launch app (fresh state, no clips)
+2. Observe welcome screen
+3. Verify **designated drop zone** appears:
+   - 📁 Icon at top
+   - "Drop video file here" text
+   - "or click below to browse" hint
+4. Drag video file from Finder **onto drop zone**
+5. Verify drop zone highlights (blue border, slight scale up)
+6. Drop file
+7. Verify video imports
+
+**Expected:**
+- [ ] Drop zone visually distinct (dashed border, background)
+- [ ] Hover effect (border color change)
+- [ ] Drag-over effect (blue glow, scale up)
+- [ ] Drop imports video correctly
+- [ ] Drop zone also works on main screen (after importing first video)
+
+---
+
+### Test 8: Track Duration Mismatch Warning
+
+**Goal:** Verify warning dialog when track durations differ
+
+**Steps:**
+1. Import a 10-second video → Place on Track 0
+2. Record 5-second webcam → Place on Track 1
+3. Click **Export**
+4. Verify warning dialog appears:
+   - ✅ Shows Track 0 duration (10.0s)
+   - ✅ Shows Track 1 duration (5.0s)
+   - ✅ Warning message about mismatch
+   - ✅ "Continue" and "Cancel" buttons
+5. Click "Cancel" → Export aborted
+6. Click Export again → Click "Continue" → Export proceeds
+
+**Expected:**
+- [ ] Warning only appears if duration difference > 0.5 seconds
+- [ ] User can choose to continue or cancel
+- [ ] Export works correctly regardless of mismatch
+- [ ] Longer track determines final video duration
+
+---
+
+### Test 9: DMG Distribution (macOS)
+
+**Goal:** Verify DMG installer builds and installs correctly
+
+**Steps:**
+1. Build DMG: `npm run build:mac`
+2. Verify build completes (~2-3 minutes)
+3. Locate `dist/clipforge-1.0.0-arm64.dmg` (or `x64` variant)
+4. Double-click DMG to mount
+5. Verify installer window appears:
+   - ✅ ClipForge app icon on left
+   - ✅ Applications folder shortcut on right
+   - ✅ Dark background (#1a1a1a)
+   - ✅ Clear drag-to-install layout
+6. Drag ClipForge.app to Applications
+7. Eject DMG
+8. Open **Finder → Applications**
+9. Right-click ClipForge → Open (first launch, unsigned app)
+10. Confirm "Open" in Gatekeeper dialog
+11. App launches
+12. **Run full smoke test** (import, record, multi-track, export)
+
+**Expected:**
+- [ ] DMG builds successfully
+- [ ] File size: ~150-160 MB
+- [ ] Installer window is professional and clear
+- [ ] App installs to Applications folder
+- [ ] Installed app launches and runs normally
+- [ ] All features work in installed version
+- [ ] App has camera/microphone permissions
+- [ ] Screen recording permission prompt appears
+
+**Alternative: ZIP Distribution**
+
+**Steps:**
+1. Build ZIP: `npm run build:mac:zip`
+2. Locate `dist/clipforge-1.0.0-arm64-mac.zip`
+3. Unzip (Finder does automatically)
+4. Drag ClipForge.app to Applications
+5. Right-click → Open (first launch)
+6. Run smoke test
+
+**Expected:**
+- [ ] ZIP builds successfully
+- [ ] File size: ~145-150 MB (slightly smaller than DMG)
+- [ ] App works identically to DMG version
 
 ---
 

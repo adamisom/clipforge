@@ -8,21 +8,25 @@ import { useClips } from './hooks/useClips'
 import { useClipImport } from './hooks/useClipImport'
 import { useRecording } from './hooks/useRecording'
 import { isTempFile } from './utils/clipUtils'
+import SimultaneousRecorder from './components/SimultaneousRecorder'
 
 // Feature flags
 const ENABLE_DRAG_AND_DROP = true
 
 function App(): React.JSX.Element {
   const { clips, selectedClipId, setClips, setSelectedClipId, addClip } = useClips()
-  const { handleImport, handleDrop } = useClipImport(addClip)
+  const { handleImport, handleDrop } = useClipImport(addClip, clips)
   const {
     showWebcamRecorder,
     showScreenRecorder,
+    showSimultaneousRecorder,
     setShowWebcamRecorder,
     setShowScreenRecorder,
+    setShowSimultaneousRecorder,
     handleWebcamRecordingComplete,
-    handleScreenRecordingComplete
-  } = useRecording(addClip)
+    handleScreenRecordingComplete,
+    handleSimultaneousRecordingComplete
+  } = useRecording(addClip, clips)
 
   const [isDragging, setIsDragging] = useState(false)
 
@@ -33,8 +37,11 @@ function App(): React.JSX.Element {
   }
 
   const handleDragLeave = (e: React.DragEvent): void => {
-    e.preventDefault()
-    setIsDragging(false)
+    // Only set isDragging to false if we're actually leaving the App container
+    // (not just entering a child element like the drop zone)
+    if (e.currentTarget === e.target) {
+      setIsDragging(false)
+    }
   }
 
   const handleDropEvent = async (e: React.DragEvent): Promise<void> => {
@@ -66,14 +73,20 @@ function App(): React.JSX.Element {
       setShowScreenRecorder(true)
     }
 
+    const handleMenuRecordSimultaneous = (): void => {
+      setShowSimultaneousRecorder(true)
+    }
+
     window.api.onMenuRecordWebcam(handleMenuRecordWebcam)
     window.api.onMenuRecordScreen(handleMenuRecordScreen)
+    window.api.onMenuRecordSimultaneous(handleMenuRecordSimultaneous)
 
     return () => {
       window.api.removeAllListeners('menu-record-webcam')
       window.api.removeAllListeners('menu-record-screen')
+      window.api.removeAllListeners('menu-record-simultaneous')
     }
-  }, [setShowWebcamRecorder, setShowScreenRecorder])
+  }, [setShowWebcamRecorder, setShowScreenRecorder, setShowSimultaneousRecorder])
 
   // Listen for quit check - respond with whether we have temp files
   useEffect(() => {
@@ -102,6 +115,7 @@ function App(): React.JSX.Element {
           onImport={handleImport}
           onRecordWebcam={() => setShowWebcamRecorder(true)}
           onRecordScreen={() => setShowScreenRecorder(true)}
+          onRecordSimultaneous={() => setShowSimultaneousRecorder(true)}
           isDragging={isDragging}
           enableDragAndDrop={ENABLE_DRAG_AND_DROP}
         />
@@ -128,6 +142,13 @@ function App(): React.JSX.Element {
         <ScreenRecorder
           onRecordingComplete={handleScreenRecordingComplete}
           onClose={() => setShowScreenRecorder(false)}
+        />
+      )}
+
+      {showSimultaneousRecorder && (
+        <SimultaneousRecorder
+          onComplete={handleSimultaneousRecordingComplete}
+          onClose={() => setShowSimultaneousRecorder(false)}
         />
       )}
     </div>

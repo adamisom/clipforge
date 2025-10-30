@@ -4,7 +4,8 @@ import {
   calculateClipPositions,
   getCurrentClip,
   getRelativePlayheadPosition,
-  getTotalDuration
+  getTotalDuration,
+  getTrack0Clips
 } from '../utils/clipUtils'
 
 interface UseMultiClipPlaybackReturn {
@@ -27,13 +28,16 @@ export const useMultiClipPlayback = (clips: TimelineClip[]): UseMultiClipPlaybac
   const [playheadPosition, setPlayheadPosition] = useState(0)
   const [isPlaying, setIsPlaying] = useState(false)
 
-  const totalDuration = getTotalDuration(clips)
+  // CRITICAL: Only use Track 0 clips for playback (Track 1 is overlay metadata for export)
+  const track0Clips = getTrack0Clips(clips)
 
-  const clipPositions = useMemo(() => calculateClipPositions(clips), [clips])
+  const totalDuration = getTotalDuration(track0Clips)
+
+  const clipPositions = useMemo(() => calculateClipPositions(track0Clips), [track0Clips])
 
   const currentClip = useMemo(
-    () => getCurrentClip(clips, clipPositions, playheadPosition),
-    [clips, clipPositions, playheadPosition]
+    () => getCurrentClip(track0Clips, clipPositions, playheadPosition),
+    [track0Clips, clipPositions, playheadPosition]
   )
 
   const relativePlayheadPosition = useMemo(
@@ -53,10 +57,10 @@ export const useMultiClipPlayback = (clips: TimelineClip[]): UseMultiClipPlaybac
       // Check if we've reached the end of current clip
       if (newPlayheadPosition >= position.end) {
         // Find next clip
-        const currentIndex = clips.findIndex((c) => c.id === currentClip.id)
-        if (currentIndex < clips.length - 1) {
+        const currentIndex = track0Clips.findIndex((c) => c.id === currentClip.id)
+        if (currentIndex < track0Clips.length - 1) {
           // Auto-advance to next clip
-          const nextClip = clips[currentIndex + 1]
+          const nextClip = track0Clips[currentIndex + 1]
           const nextPosition = clipPositions.get(nextClip.id)
           if (nextPosition) {
             setPlayheadPosition(nextPosition.start)
@@ -70,7 +74,7 @@ export const useMultiClipPlayback = (clips: TimelineClip[]): UseMultiClipPlaybac
         setPlayheadPosition(newPlayheadPosition)
       }
     },
-    [currentClip, clipPositions, clips, totalDuration]
+    [currentClip, clipPositions, track0Clips, totalDuration]
   )
 
   const handlePlayheadChange = useCallback((position: number) => {

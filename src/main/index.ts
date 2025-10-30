@@ -473,6 +473,151 @@ app.whenReady().then(async () => {
     }
   )
 
+  // Multi-track export with PiP overlay
+  ipcMain.handle(
+    'export-multi-track',
+    async (
+      _event,
+      track0Clips: Array<{
+        id: string
+        sourcePath: string
+        sourceStartTime: number
+        timelineDuration: number
+      }>,
+      track1Clips: Array<{
+        id: string
+        sourcePath: string
+        sourceStartTime: number
+        timelineDuration: number
+      }>,
+      pipConfig: {
+        position: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left'
+        size: 'small' | 'medium' | 'large'
+      },
+      outputPath: string
+    ) => {
+      const mainWindow = BrowserWindow.getAllWindows()[0]
+
+      return new Promise((resolve, reject) => {
+        const command = ffmpeg()
+
+        // Step 1: Add all Track 0 (main) inputs
+        track0Clips.forEach((clip) => {
+          command.input(clip.sourcePath)
+        })
+
+        // Step 2: Add all Track 1 (PiP) inputs
+        track1Clips.forEach((clip) => {
+          command.input(clip.sourcePath)
+        })
+
+        // Step 3: Build complex filter
+        const filterParts: string[] = []
+
+        // Trim and prepare Track 0 clips
+        track0Clips.forEach((clip, i) => {
+          filterParts.push(
+            `[${i}:v]trim=start=${clip.sourceStartTime}:duration=${clip.timelineDuration},setpts=PTS-STARTPTS[v0_${i}]`
+          )
+          filterParts.push(
+            `[${i}:a]atrim=start=${clip.sourceStartTime}:duration=${clip.timelineDuration},asetpts=PTS-STARTPTS[a0_${i}]`
+          )
+        })
+
+        // Concatenate Track 0 clips
+        if (track0Clips.length > 1) {
+          const v0Inputs = track0Clips.map((_, i) => `[v0_${i}]`).join('')
+          const a0Inputs = track0Clips.map((_, i) => `[a0_${i}]`).join('')
+          filterParts.push(`${v0Inputs}concat=n=${track0Clips.length}:v=1:a=0[v0]`)
+          filterParts.push(`${a0Inputs}concat=n=${track0Clips.length}:v=0:a=1[a0]`)
+        } else {
+          filterParts.push(`[v0_0]copy[v0]`)
+          filterParts.push(`[a0_0]copy[a0]`)
+        }
+
+        // Trim and prepare Track 1 clips
+        const track1StartIndex = track0Clips.length
+        track1Clips.forEach((clip, i) => {
+          const inputIndex = track1StartIndex + i
+          filterParts.push(
+            `[${inputIndex}:v]trim=start=${clip.sourceStartTime}:duration=${clip.timelineDuration},setpts=PTS-STARTPTS[v1_${i}]`
+          )
+          filterParts.push(
+            `[${inputIndex}:a]atrim=start=${clip.sourceStartTime}:duration=${clip.timelineDuration},asetpts=PTS-STARTPTS[a1_${i}]`
+          )
+        })
+
+        // Concatenate Track 1 clips
+        if (track1Clips.length > 1) {
+          const v1Inputs = track1Clips.map((_, i) => `[v1_${i}]`).join('')
+          const a1Inputs = track1Clips.map((_, i) => `[a1_${i}]`).join('')
+          filterParts.push(`${v1Inputs}concat=n=${track1Clips.length}:v=1:a=0[v1]`)
+          filterParts.push(`${a1Inputs}concat=n=${track1Clips.length}:v=0:a=1[a1]`)
+        } else {
+          filterParts.push(`[v1_0]copy[v1]`)
+          filterParts.push(`[a1_0]copy[a1]`)
+        }
+
+        // Step 4: Calculate PiP overlay position
+        // Sizes: small = 15%, medium = 25%, large = 40%
+        const sizeMap = { small: 0.15, medium: 0.25, large: 0.4 }
+        const pipSize = sizeMap[pipConfig.size]
+
+        // Position offsets (20px padding from edges)
+        const padding = 20
+
+        // Overlay filter with position
+        // Format: overlay=x:y
+        let overlayPosition: string
+        switch (pipConfig.position) {
+          case 'bottom-right':
+            overlayPosition = `overlay=W-w-${padding}:H-h-${padding}`
+            break
+          case 'bottom-left':
+            overlayPosition = `overlay=${padding}:H-h-${padding}`
+            break
+          case 'top-right':
+            overlayPosition = `overlay=W-w-${padding}:${padding}`
+            break
+          case 'top-left':
+            overlayPosition = `overlay=${padding}:${padding}`
+            break
+          default:
+            overlayPosition = `overlay=W-w-${padding}:H-h-${padding}` // default to bottom-right
+        }
+
+        // Scale PiP to correct size (relative to main video width)
+        filterParts.push(`[v1]scale=iw*${pipSize}:ih*${pipSize}[v1scaled]`)
+
+        // Overlay PiP on main video
+        filterParts.push(`[v0][v1scaled]${overlayPosition}[outv]`)
+
+        // Mix audio from both tracks (equal volume)
+        filterParts.push(`[a0][a1]amix=inputs=2:duration=longest[outa]`)
+
+        // Step 5: Run FFmpeg command
+        command
+          .complexFilter(filterParts.join(';'))
+          .outputOptions(['-map', '[outv]', '-map', '[outa]'])
+          .output(outputPath)
+          .videoCodec('libx264')
+          .audioCodec('aac')
+          .on('progress', (progress) => {
+            mainWindow.webContents.send('export-progress', progress)
+          })
+          .on('end', () => {
+            mainWindow.webContents.send('export-complete')
+            resolve({ success: true })
+          })
+          .on('error', (err) => {
+            mainWindow.webContents.send('export-error', { message: err.message })
+            reject(err)
+          })
+          .run()
+      })
+    }
+  )
+
   // Check if a file path is in the temp directory
   ipcMain.handle('is-temp-file', (_event, filePath: string) => {
     return isTempFile(filePath)
@@ -525,16 +670,30 @@ app.whenReady().then(async () => {
 
   // Get screen sources for recording
   ipcMain.handle('get-screen-sources', async () => {
-    const sources = await desktopCapturer.getSources({
-      types: ['screen', 'window'],
-      thumbnailSize: { width: 300, height: 200 }
-    })
+    try {
+      console.log('[main] Getting screen sources...')
+      const sources = await desktopCapturer.getSources({
+        types: ['screen', 'window'],
+        thumbnailSize: { width: 150, height: 100 } // Reduced size to avoid IPC limits
+      })
 
-    return sources.map((source) => ({
-      id: source.id,
-      name: source.name,
-      thumbnail: source.thumbnail.toDataURL()
-    }))
+      console.log(`[main] Found ${sources.length} sources`)
+
+      return sources.map((source) => {
+        // Convert to smaller JPEG format and resize to reduce IPC payload
+        const thumbnail = source.thumbnail.resize({ width: 150, height: 100 })
+        const dataUrl = thumbnail.toJPEG(60) // 60% quality JPEG
+
+        return {
+          id: source.id,
+          name: source.name,
+          thumbnail: `data:image/jpeg;base64,${dataUrl.toString('base64')}`
+        }
+      })
+    } catch (err) {
+      console.error('[main] Error getting screen sources:', err)
+      throw err
+    }
   })
 
   // Start recording - minimize window, show notification, register shortcut
@@ -706,6 +865,13 @@ app.whenReady().then(async () => {
           accelerator: 'CmdOrCtrl+Shift+R',
           click: () => {
             mainWindow.webContents.send('menu-record-screen')
+          }
+        },
+        {
+          label: 'Record Screen + Webcam',
+          accelerator: 'CmdOrCtrl+Shift+B',
+          click: () => {
+            mainWindow.webContents.send('menu-record-simultaneous')
           }
         }
       ]

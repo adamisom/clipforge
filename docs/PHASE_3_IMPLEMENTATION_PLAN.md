@@ -2,7 +2,7 @@
 
 **Focus:** Multi-track timeline with PiP support, simultaneous recording, audio mixing, and timeline zoom
 
-**Estimated Effort:** ~35 hours (4-5 full days)
+**Estimated Effort:** ~38.5 hours (5 full days)
 
 ---
 
@@ -283,7 +283,7 @@ const currentClip = useMemo(() => {
 
 ---
 
-### **Phase B: Simultaneous Screen + Webcam Recording** (~6 hours)
+### **Phase B: Simultaneous Screen + Webcam Recording** (~6.5 hours)
 
 **Goal:** Record screen and webcam simultaneously, save to separate tracks
 
@@ -453,7 +453,69 @@ onMenuRecordSimultaneous: (callback) =>
 
 ---
 
-### **Phase C: PiP Position/Size Configuration** (~4 hours)
+#### B.4: Track Duration Mismatch Warning (~30 min)
+
+**Files to Update:**
+- `src/main/index.ts` (update `export-multi-track` handler)
+- `src/renderer/src/components/VideoEditor.tsx`
+
+**Implementation:**
+```typescript
+// In export-multi-track handler (main process)
+const track0Duration = getTotalDuration(track0Clips)
+const track1Duration = getTotalDuration(track1Clips)
+
+if (Math.abs(track0Duration - track1Duration) > 0.5) {
+  // Send warning back to renderer
+  mainWindow.webContents.send('track-duration-mismatch', {
+    track0Duration,
+    track1Duration
+  })
+  
+  // Wait for user confirmation before continuing
+  return new Promise((resolve) => {
+    ipcMain.once('track-duration-mismatch-continue', () => {
+      // Continue with export...
+      resolve(/* export logic */)
+    })
+  })
+}
+```
+
+**Renderer (VideoEditor.tsx):**
+```typescript
+useEffect(() => {
+  const handleDurationMismatch = ({ track0Duration, track1Duration }) => {
+    const proceed = window.confirm(
+      `Track duration mismatch detected:\n\n` +
+      `Track 0: ${track0Duration.toFixed(1)}s\n` +
+      `Track 1: ${track1Duration.toFixed(1)}s\n\n` +
+      `The overlay will only appear for the shorter duration. Continue?`
+    )
+    
+    if (proceed) {
+      window.api.sendTrackDurationMismatchContinue()
+    }
+  }
+  
+  window.api.onTrackDurationMismatch(handleDurationMismatch)
+  
+  return () => {
+    window.api.removeAllListeners('track-duration-mismatch')
+  }
+}, [])
+```
+
+**Testing Checkpoint:**
+- Add 10s clip to Track 0, 5s clip to Track 1
+- Export → warning dialog appears
+- Shows correct durations
+- Cancel → export stops
+- Continue → export proceeds
+
+---
+
+### **Phase C: PiP Position/Size Configuration** (~7 hours)
 
 **Goal:** Allow users to choose where and how big the PiP overlay appears
 
@@ -602,6 +664,183 @@ function calculatePipPosition(pipConfig) {
 - PiP appears in selected position
 - PiP size matches selected size
 - Audio from both tracks mixes
+
+---
+
+#### C.3: PiP Preview in VideoPreview (~3 hours)
+
+**Goal:** Show real-time PiP overlay in the video preview so users can see their configuration before export
+
+**Files to Update:**
+- `src/renderer/src/components/VideoPreview.tsx`
+- `src/renderer/src/components/VideoEditor.tsx`
+- `src/renderer/src/assets/main.css`
+
+**Implementation:**
+
+```tsx
+// VideoPreview.tsx
+interface VideoPreviewProps {
+  // ... existing props
+  pipClip?: TimelineClip | null  // NEW: Track 1 clip to show as PiP
+  pipConfig: {
+    position: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left'
+    size: 'small' | 'medium' | 'large'
+  }
+}
+
+function VideoPreview({ 
+  sourcePath,
+  trimStart,
+  trimEnd,
+  playheadPosition,
+  isPlaying,
+  pipClip,  // NEW
+  pipConfig,  // NEW
+  onPlayPause,
+  onTimeUpdate
+}: VideoPreviewProps): React.JSX.Element {
+  const mainVideoRef = useRef<HTMLVideoElement>(null)
+  const pipVideoRef = useRef<HTMLVideoElement>(null)
+  
+  // Sync PiP video with main video
+  useEffect(() => {
+    if (!pipVideoRef.current || !pipClip || !mainVideoRef.current) return
+    
+    // Sync play/pause
+    if (isPlaying) {
+      pipVideoRef.current.play().catch(console.error)
+    } else {
+      pipVideoRef.current.pause()
+    }
+  }, [isPlaying, pipClip])
+  
+  // Sync PiP time with main video time
+  useEffect(() => {
+    if (!pipVideoRef.current || !pipClip || isPlaying) return
+    
+    // Calculate relative time in PiP clip
+    const pipRelativeTime = playheadPosition - 0  // Assuming clips start at same time
+    const pipSourceTime = pipClip.sourceStartTime + pipRelativeTime
+    
+    // Clamp to PiP clip bounds
+    if (pipSourceTime >= pipClip.sourceStartTime && 
+        pipSourceTime <= pipClip.sourceStartTime + pipClip.timelineDuration) {
+      pipVideoRef.current.currentTime = pipSourceTime
+    }
+  }, [playheadPosition, pipClip, isPlaying])
+  
+  // Calculate PiP position/size styles
+  const getPipStyle = (): React.CSSProperties => {
+    const sizeMap = {
+      small: '15%',
+      medium: '25%',
+      large: '40%'
+    }
+    
+    const positionMap = {
+      'bottom-right': { bottom: '20px', right: '20px' },
+      'bottom-left': { bottom: '20px', left: '20px' },
+      'top-right': { top: '20px', right: '20px' },
+      'top-left': { top: '20px', left: '20px' }
+    }
+    
+    return {
+      position: 'absolute',
+      width: sizeMap[pipConfig.size],
+      ...positionMap[pipConfig.position],
+      border: '2px solid white',
+      borderRadius: '8px',
+      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)',
+      zIndex: 10,
+      objectFit: 'cover'
+    }
+  }
+  
+  return (
+    <div className="video-preview-container" style={{ position: 'relative' }}>
+      {sourcePath ? (
+        <>
+          {/* Main video (Track 0) */}
+          <video
+            ref={mainVideoRef}
+            src={`file://${sourcePath}`}
+            onTimeUpdate={handleTimeUpdate}
+            style={{
+              maxWidth: '100%',
+              maxHeight: '100%',
+              objectFit: 'contain'
+            }}
+          />
+          
+          {/* PiP overlay (Track 1) */}
+          {pipClip && (
+            <video
+              ref={pipVideoRef}
+              src={`file://${pipClip.sourcePath}`}
+              muted  // CRITICAL: Mute PiP to avoid dual audio (Track 0 audio plays)
+              style={getPipStyle()}
+            />
+          )}
+          
+          <div className="video-controls">
+            <button onClick={onPlayPause}>{isPlaying ? '⏸' : '▶'}</button>
+          </div>
+        </>
+      ) : (
+        <div className="preview-placeholder">No video loaded</div>
+      )}
+    </div>
+  )
+}
+```
+
+**VideoEditor.tsx changes:**
+```tsx
+// Calculate current Track 1 clip at playhead position
+const currentPipClip = useMemo(() => {
+  const track1Clips = clips.filter(c => c.trackIndex === 1)
+  if (track1Clips.length === 0) return null
+  
+  const track1Positions = calculateClipPositions(track1Clips)
+  return getCurrentClip(track1Clips, track1Positions, playheadPosition)
+}, [clips, playheadPosition])
+
+// Pass to VideoPreview
+<VideoPreview
+  // ... existing props
+  pipClip={currentPipClip}
+  pipConfig={pipConfig}
+/>
+```
+
+**CSS additions:**
+```css
+.video-preview-container video {
+  pointer-events: none; /* Prevent PiP video from blocking main video controls */
+}
+
+.video-preview-container {
+  background: #000;
+  border-radius: 8px;
+  overflow: hidden;
+}
+```
+
+**Testing Checkpoint:**
+- Add clip to Track 0, clip to Track 1
+- Preview shows main video with PiP overlay
+- Change PiP position dropdown → overlay moves in preview
+- Change PiP size dropdown → overlay resizes in preview
+- Play video → both videos play in sync
+- Pause → both videos pause
+- Drag playhead → both videos seek together
+- PiP audio is muted (only Track 0 audio plays)
+
+**⚠️ Notes:**
+- PiP sync may drift slightly during playback (±50ms) due to browser video decoding - this is acceptable for preview
+- Export will have perfect sync via FFmpeg
+- If PiP clip is shorter than Track 0, PiP will disappear when its clip ends (matches export behavior)
 
 ---
 
@@ -1085,6 +1324,10 @@ npm run build:mac
 - [ ] Both recording indicators visible
 - [ ] Stop recording → prompted for both saves
 - [ ] Screen on Track 0, webcam on Track 1
+- [ ] Duration mismatch warning → shows when tracks have ±0.5s difference
+- [ ] Warning shows correct durations for both tracks
+- [ ] Cancel warning → export stops
+- [ ] Continue warning → export proceeds
 
 **PiP Configuration:**
 - [ ] Export with Track 1 clips → shows config dialog
@@ -1092,6 +1335,17 @@ npm run build:mac
 - [ ] Change size → dropdown updates
 - [ ] Export bottom-right medium → PiP in correct spot
 - [ ] Export top-left large → PiP in correct spot
+
+**PiP Preview:**
+- [ ] Add clip to Track 0, clip to Track 1
+- [ ] Preview shows main video with PiP overlay
+- [ ] Change PiP position → overlay moves in preview
+- [ ] Change PiP size → overlay resizes in preview
+- [ ] Play video → both videos play in sync
+- [ ] Pause → both videos pause
+- [ ] Drag playhead → both videos seek together
+- [ ] PiP audio is muted (only Track 0 audio plays)
+- [ ] If Track 1 clip ends before Track 0, PiP disappears correctly
 
 **Audio Mixing:**
 - [ ] Track 0 slider → value updates
@@ -1136,8 +1390,8 @@ npm run build:mac
 **Technical Debt:**
 - `webSecurity: false` still enabled (fix in Phase 4)
 - No audio waveform visualization on timeline
-- No real-time PiP preview (only visible on export)
 - Timeline zoom doesn't persist between sessions
+- PiP sync may drift slightly during preview playback (±50ms, acceptable for preview)
 
 ---
 
@@ -1149,6 +1403,8 @@ Phase 3 is complete when:
 ✅ Clips auto-assign to correct track based on source type  
 ✅ Context menu allows moving clips between tracks  
 ✅ Simultaneous screen + webcam recording works  
+✅ Track duration mismatch warning shows when needed  
+✅ PiP preview shows real-time overlay in VideoPreview  
 ✅ Export with Track 1 clips shows PiP config dialog  
 ✅ PiP position/size presets work correctly  
 ✅ Audio mixing sliders adjust relative volume  
@@ -1160,7 +1416,7 @@ Phase 3 is complete when:
 
 ---
 
-**Estimated Total Effort:** ~35 hours  
-**Recommended Schedule:** 5 days × 7 hours/day  
+**Estimated Total Effort:** ~38.5 hours  
+**Recommended Schedule:** 5 days × 7-8 hours/day  
 **Next:** Phase 4 (Polish + Production Ready)
 
