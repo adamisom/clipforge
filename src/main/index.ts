@@ -75,6 +75,49 @@ function createWindow(): void {
     mainWindow.show()
   })
 
+  // Intercept window close (red X button)
+  mainWindow.on('close', async (e) => {
+    if (quitting) return
+
+    e.preventDefault()
+
+    // Check for temp files with timeout
+    const timeoutPromise = new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 2000))
+
+    const checkPromise = new Promise<boolean>((resolve) => {
+      mainWindow.webContents.send('check-unsaved-recordings')
+      ipcMain.once('unsaved-recordings-response', (_event, { hasTempFiles }) => {
+        resolve(hasTempFiles)
+      })
+    })
+
+    const hasTempFiles = await Promise.race([checkPromise, timeoutPromise])
+
+    if (hasTempFiles) {
+      const response = await dialog.showMessageBox(mainWindow, {
+        type: 'warning',
+        buttons: ['Quit Anyway', 'Cancel'],
+        defaultId: 1,
+        title: 'Unsaved Recordings',
+        message: 'You have unsaved recordings',
+        detail: 'These recordings are temporary and will be deleted when you quit.'
+      })
+
+      if (response.response === 0) {
+        // User chose "Quit Anyway"
+        quitting = true
+        mainWindow.destroy()
+        app.quit()
+      }
+      // If Cancel (response === 1), do nothing (preventDefault already called)
+    } else {
+      // No temp files, safe to close
+      quitting = true
+      mainWindow.destroy()
+      app.quit()
+    }
+  })
+
   mainWindow.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url)
     return { action: 'deny' }

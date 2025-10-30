@@ -217,6 +217,29 @@ function VideoEditor({
     }
   }, [clips])
 
+  const handleSavePermanently = useCallback(async (): Promise<void> => {
+    if (!selectedClipId) return
+
+    const clip = clips.find((c) => c.id === selectedClipId)
+    if (!clip) return
+
+    const isTemp = await window.api.isTempFile(clip.sourcePath)
+    if (!isTemp) return
+
+    try {
+      const result = await window.api.saveRecordingPermanent(clip.sourcePath)
+      const newPath = result.path
+
+      // Update clip with new permanent path
+      setClips((prevClips) =>
+        prevClips.map((c) => (c.id === selectedClipId ? { ...c, sourcePath: newPath } : c))
+      )
+    } catch (error) {
+      console.error('Failed to save permanently:', error)
+      alert(`Failed to save: ${error}`)
+    }
+  }, [selectedClipId, clips, setClips])
+
   // Listen for menu events
   useEffect(() => {
     const handleMenuExport = (): void => {
@@ -269,6 +292,7 @@ function VideoEditor({
         totalClips={clips.length}
         onExport={handleExport}
         onDeleteClip={handleDeleteClip}
+        onSavePermanently={handleSavePermanently}
       />
     </div>
   )

@@ -1,18 +1,34 @@
 import { TimelineClip } from '../types/timeline'
+import { useEffect, useState } from 'react'
 
 interface InfoPanelProps {
   currentClip: TimelineClip | undefined
   totalClips: number
   onExport: () => Promise<void>
   onDeleteClip: () => void
+  onSavePermanently: () => Promise<void>
 }
 
 function InfoPanel({
   currentClip,
   totalClips,
   onExport,
-  onDeleteClip
+  onDeleteClip,
+  onSavePermanently
 }: InfoPanelProps): React.JSX.Element {
+  const [isTemp, setIsTemp] = useState(false)
+
+  useEffect(() => {
+    const checkIfTemp = async (): Promise<void> => {
+      if (currentClip) {
+        const temp = await window.api.isTempFile(currentClip.sourcePath)
+        setIsTemp(temp)
+      } else {
+        setIsTemp(false)
+      }
+    }
+    checkIfTemp()
+  }, [currentClip])
   return (
     <div className="info-panel">
       <div className="info-content">
@@ -40,6 +56,27 @@ function InfoPanel({
       </div>
 
       <div className="button-group">
+        {isTemp && currentClip && (
+          <button
+            onClick={onSavePermanently}
+            className="save-permanent-button"
+            style={{
+              padding: '10px 20px',
+              background: '#ffa500',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              marginBottom: '12px',
+              fontWeight: 'bold'
+            }}
+            title="Save this temporary recording permanently"
+          >
+            💾 Save Permanently
+          </button>
+        )}
+
         <button
           onClick={onDeleteClip}
           disabled={!currentClip}

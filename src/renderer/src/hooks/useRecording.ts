@@ -24,12 +24,10 @@ export const useRecording = (onClipAdded: (clip: TimelineClip) => void): UseReco
         const arrayBuffer = await blob.arrayBuffer()
         const tempPath = await window.api.saveRecordingBlob(arrayBuffer)
 
-        const result = await window.api.saveRecordingPermanent(tempPath)
-        const finalPath = result.path
+        // Add to timeline immediately with temp path (user can save permanently later)
+        const metadata = await window.api.getVideoMetadata(tempPath)
 
-        const metadata = await window.api.getVideoMetadata(finalPath)
-
-        const newClip = createClipFromMetadata('webcam', finalPath, metadata, durationSeconds)
+        const newClip = createClipFromMetadata('webcam', tempPath, metadata, durationSeconds)
 
         onClipAdded(newClip)
       } catch (error) {
@@ -46,12 +44,10 @@ export const useRecording = (onClipAdded: (clip: TimelineClip) => void): UseReco
         const arrayBuffer = await blob.arrayBuffer()
         const tempPath = await window.api.saveRecordingBlob(arrayBuffer)
 
-        const result = await window.api.saveRecordingPermanent(tempPath)
-        const finalPath = result.path
+        // Add to timeline immediately with temp path (user can save permanently later)
+        const metadata = await window.api.getVideoMetadata(tempPath)
 
-        const metadata = await window.api.getVideoMetadata(finalPath)
-
-        const newClip = createClipFromMetadata('screen', finalPath, metadata, durationSeconds)
+        const newClip = createClipFromMetadata('screen', tempPath, metadata, durationSeconds)
 
         onClipAdded(newClip)
       } catch (error) {
