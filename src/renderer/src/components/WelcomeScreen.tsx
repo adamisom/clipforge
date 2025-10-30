@@ -2,6 +2,7 @@ interface WelcomeScreenProps {
   onImport: () => void
   onRecordWebcam: () => void
   onRecordScreen: () => void
+  onRecordSimultaneous: () => void
   isDragging: boolean
   enableDragAndDrop?: boolean
 }
@@ -10,6 +11,7 @@ function WelcomeScreen({
   onImport,
   onRecordWebcam,
   onRecordScreen,
+  onRecordSimultaneous,
   isDragging,
   enableDragAndDrop = true
 }: WelcomeScreenProps): React.JSX.Element {
@@ -50,6 +52,13 @@ function WelcomeScreen({
           title="Record Webcam (Cmd+Shift+W)"
         >
           📹
+        </button>
+        <button
+          onClick={onRecordSimultaneous}
+          className="welcome-record-button"
+          title="Record Screen + Webcam (Cmd+Shift+B)"
+        >
+          🖥️📹
         </button>
       </div>
     </div>

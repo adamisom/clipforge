@@ -115,6 +115,7 @@ function App(): React.JSX.Element {
           onImport={handleImport}
           onRecordWebcam={() => setShowWebcamRecorder(true)}
           onRecordScreen={() => setShowScreenRecorder(true)}
+          onRecordSimultaneous={() => setShowSimultaneousRecorder(true)}
           isDragging={isDragging}
           enableDragAndDrop={ENABLE_DRAG_AND_DROP}
         />
