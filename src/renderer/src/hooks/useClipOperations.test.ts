@@ -11,7 +11,7 @@ global.window.alert = vi.fn()
 global.window.api = {
   isTempFile: vi.fn(),
   saveRecordingPermanent: vi.fn()
-} as any
+} as unknown as Window['api']
 
 describe('useClipOperations', () => {
   let mockClips: TimelineClip[]
@@ -66,7 +66,9 @@ describe('useClipOperations', () => {
     vi.clearAllMocks()
   })
 
-  const renderClipOperations = (overrides = {}) => {
+  const renderClipOperations = (
+    overrides = {}
+  ): ReturnType<typeof renderHook<ReturnType<typeof useClipOperations>, unknown>> => {
     return renderHook(() =>
       useClipOperations({
         clips: mockClips,
@@ -239,7 +241,7 @@ describe('useClipOperations', () => {
 
     it('generates new IDs for split clips', () => {
       const originalClipId = mockClips[0].id // Save original ID before split
-      
+
       const { result } = renderClipOperations({
         currentClip: mockClips[0],
         playheadPosition: 5
@@ -258,11 +260,11 @@ describe('useClipOperations', () => {
       // Both should be different from original
       expect(firstSplit.id).not.toBe(originalClipId)
       expect(secondSplit.id).not.toBe(originalClipId)
-      
+
       // Both should match clip ID pattern
       expect(firstSplit.id).toMatch(/^clip-/)
       expect(secondSplit.id).toMatch(/^clip-/)
-      
+
       // Both should have valid IDs
       expect(firstSplit.id).toBeTruthy()
       expect(secondSplit.id).toBeTruthy()
@@ -307,8 +309,8 @@ describe('useClipOperations', () => {
     })
 
     it('maintains trackIndex in split clips', () => {
-      const { result} = renderClipOperations({
-        currentClip: mockClips[2], // clip3 on Track 1  
+      const { result } = renderClipOperations({
+        currentClip: mockClips[2], // clip3 on Track 1
         playheadPosition: 2, // 2 seconds into clip3 (relative to its start in timeline)
         clips: mockClips
       })
@@ -332,7 +334,7 @@ describe('useClipOperations', () => {
 
   describe('handleDeleteClip', () => {
     beforeEach(() => {
-      ;(window.confirm as any).mockReturnValue(true)
+      ;(window.confirm as unknown as ReturnType<typeof vi.fn>).mockReturnValue(true)
     })
 
     it('removes clip from array', () => {
@@ -432,7 +434,7 @@ describe('useClipOperations', () => {
     })
 
     it('does not delete if user cancels confirmation', () => {
-      ;(window.confirm as any).mockReturnValue(false)
+      ;(window.confirm as unknown as ReturnType<typeof vi.fn>).mockReturnValue(false)
 
       const { result } = renderClipOperations({
         selectedClipId: 'clip2'
@@ -468,16 +470,16 @@ describe('useClipOperations', () => {
         result.current.handleDeleteClip()
       })
 
-      expect(window.confirm).toHaveBeenCalledWith(
-        expect.stringContaining('video1.mp4')
-      )
+      expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('video1.mp4'))
     })
   })
 
   describe('handleSavePermanently', () => {
     beforeEach(() => {
-      ;(window.api.isTempFile as any).mockResolvedValue(true)
-      ;(window.api.saveRecordingPermanent as any).mockResolvedValue({ path: '/saved/video.mp4' })
+      ;(window.api.isTempFile as ReturnType<typeof vi.fn>).mockResolvedValue(true)
+      ;(window.api.saveRecordingPermanent as ReturnType<typeof vi.fn>).mockResolvedValue({
+        path: '/saved/video.mp4'
+      })
     })
 
     it('saves temp file and updates clip path', async () => {
@@ -500,7 +502,7 @@ describe('useClipOperations', () => {
     })
 
     it('does nothing if file is not temp', async () => {
-      ;(window.api.isTempFile as any).mockResolvedValue(false)
+      ;(window.api.isTempFile as ReturnType<typeof vi.fn>).mockResolvedValue(false)
 
       const { result } = renderClipOperations({
         selectedClipId: 'clip1'
@@ -527,7 +529,9 @@ describe('useClipOperations', () => {
     })
 
     it('handles save failure gracefully', async () => {
-      ;(window.api.saveRecordingPermanent as any).mockRejectedValue(new Error('Save failed'))
+      ;(window.api.saveRecordingPermanent as ReturnType<typeof vi.fn>).mockRejectedValue(
+        new Error('Save failed')
+      )
 
       const { result } = renderClipOperations({
         selectedClipId: 'clip2',
@@ -546,4 +550,3 @@ describe('useClipOperations', () => {
     })
   })
 })
-

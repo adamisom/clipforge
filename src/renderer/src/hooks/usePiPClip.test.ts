@@ -103,15 +103,6 @@ describe('usePiPClip', () => {
 
   describe('returns null when playhead outside Track 1 clips', () => {
     it('returns null before first Track 1 clip if Track 1 has gap', () => {
-      // Create clips where Track 1 starts later
-      const gapClips: TimelineClip[] = [
-        {
-          ...mockTrack1Clips[0],
-          // Simulate Track 1 starting at timeline position 5 (would need manual positioning)
-          // For this test, we'll use empty Track 1 to simulate gap
-        }
-      ]
-
       // Empty Track 1 at playhead 0
       const { result } = renderHook(() => usePiPClip(mockTrack0Clips, 0))
       expect(result.current).toBeNull()
@@ -185,4 +176,3 @@ describe('usePiPClip', () => {
     })
   })
 })
-
