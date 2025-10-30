@@ -13,7 +13,7 @@ import { isTempFile } from './utils/clipUtils'
 const ENABLE_DRAG_AND_DROP = true
 
 function App(): React.JSX.Element {
-  const { clips, selectedClipId, setClips, addClip } = useClips()
+  const { clips, selectedClipId, setClips, setSelectedClipId, addClip } = useClips()
   const { handleImport, handleDrop } = useClipImport(addClip)
   const {
     showWebcamRecorder,
@@ -109,6 +109,7 @@ function App(): React.JSX.Element {
           clips={clips}
           setClips={setClips}
           selectedClipId={selectedClipId}
+          setSelectedClipId={setSelectedClipId}
           onImport={handleImport}
           onRecordScreen={() => setShowScreenRecorder(true)}
           onRecordWebcam={() => setShowWebcamRecorder(true)}

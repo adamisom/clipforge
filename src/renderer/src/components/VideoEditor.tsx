@@ -10,6 +10,7 @@ interface VideoEditorProps {
   clips: TimelineClip[]
   setClips: React.Dispatch<React.SetStateAction<TimelineClip[]>>
   selectedClipId: string | null
+  setSelectedClipId: React.Dispatch<React.SetStateAction<string | null>>
   onImport: () => void
   onRecordScreen: () => void
   onRecordWebcam: () => void
@@ -19,6 +20,7 @@ function VideoEditor({
   clips,
   setClips,
   selectedClipId,
+  setSelectedClipId,
   onImport,
   onRecordScreen,
   onRecordWebcam
@@ -50,9 +52,12 @@ function VideoEditor({
     }
   }, [wasPlayingBeforeDrag, play])
 
-  const handleClipSelect = useCallback(() => {
-    // Clicking a clip doesn't change playhead, just for future features
-  }, [])
+  const handleClipSelect = useCallback(
+    (clipId: string) => {
+      setSelectedClipId(clipId)
+    },
+    [setSelectedClipId]
+  )
 
   const handleTrimChange = useCallback(
     (clipId: string, newTrimStart: number, newTrimEnd: number) => {
