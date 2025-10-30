@@ -7,7 +7,10 @@ interface UseClipImportReturn {
   handleDrop: (files: FileList) => Promise<void>
 }
 
-export const useClipImport = (onClipAdded: (clip: TimelineClip) => void): UseClipImportReturn => {
+export const useClipImport = (
+  onClipAdded: (clip: TimelineClip) => void,
+  existingClips: TimelineClip[]
+): UseClipImportReturn => {
   const handleImport = useCallback(async (): Promise<void> => {
     try {
       const filePath = await window.api.selectVideoFile()
@@ -16,14 +19,20 @@ export const useClipImport = (onClipAdded: (clip: TimelineClip) => void): UseCli
       // Get metadata
       const metadata = await window.api.getVideoMetadata(filePath)
 
-      const newClip = createClipFromMetadata('imported', filePath, metadata)
+      const newClip = createClipFromMetadata(
+        'imported',
+        filePath,
+        metadata,
+        undefined,
+        existingClips
+      )
 
       onClipAdded(newClip)
     } catch (error) {
       console.error('Import failed:', error)
       alert(`Failed to import video: ${error}`)
     }
-  }, [onClipAdded])
+  }, [onClipAdded, existingClips])
 
   const handleDrop = useCallback(
     async (files: FileList): Promise<void> => {
@@ -49,14 +58,20 @@ export const useClipImport = (onClipAdded: (clip: TimelineClip) => void): UseCli
 
       try {
         const metadata = await window.api.getVideoMetadata(filePath)
-        const newClip = createClipFromMetadata('imported', filePath, metadata)
+        const newClip = createClipFromMetadata(
+          'imported',
+          filePath,
+          metadata,
+          undefined,
+          existingClips
+        )
         onClipAdded(newClip)
       } catch (error) {
         console.error('Drag-and-drop import failed:', error)
         alert(`Failed to import video: ${error}`)
       }
     },
-    [onClipAdded]
+    [onClipAdded, existingClips]
   )
 
   return {

@@ -18,7 +18,10 @@ interface UseRecordingReturn {
   ) => Promise<void>
 }
 
-export const useRecording = (onClipAdded: (clip: TimelineClip) => void): UseRecordingReturn => {
+export const useRecording = (
+  onClipAdded: (clip: TimelineClip) => void,
+  existingClips: TimelineClip[]
+): UseRecordingReturn => {
   const [showWebcamRecorder, setShowWebcamRecorder] = useState(false)
   const [showScreenRecorder, setShowScreenRecorder] = useState(false)
   const [showSimultaneousRecorder, setShowSimultaneousRecorder] = useState(false)
@@ -35,7 +38,13 @@ export const useRecording = (onClipAdded: (clip: TimelineClip) => void): UseReco
         // Add to timeline immediately with temp path (user can save permanently later)
         const metadata = await window.api.getVideoMetadata(tempPath)
 
-        const newClip = createClipFromMetadata('webcam', tempPath, metadata, durationSeconds)
+        const newClip = createClipFromMetadata(
+          'webcam',
+          tempPath,
+          metadata,
+          durationSeconds,
+          existingClips
+        )
 
         onClipAdded(newClip)
       } catch (error) {
@@ -43,7 +52,7 @@ export const useRecording = (onClipAdded: (clip: TimelineClip) => void): UseReco
         alert(`Failed to save recording: ${error}`)
       }
     },
-    [onClipAdded]
+    [onClipAdded, existingClips]
   )
 
   const handleScreenRecordingComplete = useCallback(
@@ -55,7 +64,13 @@ export const useRecording = (onClipAdded: (clip: TimelineClip) => void): UseReco
         // Add to timeline immediately with temp path (user can save permanently later)
         const metadata = await window.api.getVideoMetadata(tempPath)
 
-        const newClip = createClipFromMetadata('screen', tempPath, metadata, durationSeconds)
+        const newClip = createClipFromMetadata(
+          'screen',
+          tempPath,
+          metadata,
+          durationSeconds,
+          existingClips
+        )
 
         onClipAdded(newClip)
       } catch (error) {
@@ -63,7 +78,7 @@ export const useRecording = (onClipAdded: (clip: TimelineClip) => void): UseReco
         alert(`Failed to save recording: ${error}`)
       }
     },
-    [onClipAdded]
+    [onClipAdded, existingClips]
   )
 
   const handleSimultaneousRecordingComplete = useCallback(
@@ -83,8 +98,19 @@ export const useRecording = (onClipAdded: (clip: TimelineClip) => void): UseReco
         const webcamMetadata = await window.api.getVideoMetadata(webcamPath)
 
         // Create clips with same duration from recording timer
-        const screenClip = createClipFromMetadata('screen', screenPath, screenMetadata, duration)
-        const webcamClip = createClipFromMetadata('webcam', webcamPath, webcamMetadata, duration)
+        // Pass existingClips for smart track assignment
+        const screenClip = createClipFromMetadata(
+          'screen',
+          screenPath,
+          screenMetadata,
+          duration,
+          existingClips
+        )
+        // For simultaneous recording, we want webcam on Track 1 even if no existing clips
+        const webcamClip = createClipFromMetadata('webcam', webcamPath, webcamMetadata, duration, [
+          screenClip,
+          ...existingClips
+        ])
 
         // Add both clips (webcam auto-assigns to Track 1, screen to Track 0)
         onClipAdded(screenClip)
@@ -94,7 +120,7 @@ export const useRecording = (onClipAdded: (clip: TimelineClip) => void): UseReco
         alert(`Failed to save recording: ${error}`)
       }
     },
-    [onClipAdded]
+    [onClipAdded, existingClips]
   )
 
   return {

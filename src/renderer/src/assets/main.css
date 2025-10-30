@@ -386,7 +386,7 @@ body {
   color: #fff;
   display: flex;
   align-items: center;
-  padding: 0 8px;
+  padding: 0 8px 0 12px;
   font-size: 14px;
   cursor: pointer;
   will-change: transform;
@@ -452,9 +452,9 @@ body {
 /* Playhead */
 .playhead {
   position: absolute;
-  top: 30px; /* Start after time ruler */
+  top: 0;
   bottom: 0;
-  height: calc(100% - 30px); /* Span both tracks */
+  height: 100%;
   width: 2px;
   background: red;
   z-index: 100;
@@ -1124,4 +1124,62 @@ body {
   border-radius: 4px;
   font-family: monospace;
   font-size: 12px;
+}
+
+/* Recorder Modal Overlay */
+.recorder-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  backdrop-filter: blur(4px);
+}
+
+.recorder-modal {
+  background: #2a2a2a;
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 600px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.recorder-modal h2 {
+  margin-top: 0;
+  margin-bottom: 16px;
+  color: white;
+}
+
+.recorder-modal p {
+  color: #ccc;
+  margin-bottom: 16px;
+}
+
+.recorder-modal button {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.recorder-modal button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.recorder-modal .button-group {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 24px;
 }

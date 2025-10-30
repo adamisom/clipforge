@@ -15,7 +15,7 @@ const ENABLE_DRAG_AND_DROP = true
 
 function App(): React.JSX.Element {
   const { clips, selectedClipId, setClips, setSelectedClipId, addClip } = useClips()
-  const { handleImport, handleDrop } = useClipImport(addClip)
+  const { handleImport, handleDrop } = useClipImport(addClip, clips)
   const {
     showWebcamRecorder,
     showScreenRecorder,
@@ -26,7 +26,7 @@ function App(): React.JSX.Element {
     handleWebcamRecordingComplete,
     handleScreenRecordingComplete,
     handleSimultaneousRecordingComplete
-  } = useRecording(addClip)
+  } = useRecording(addClip, clips)
 
   const [isDragging, setIsDragging] = useState(false)
 

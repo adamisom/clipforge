@@ -94,12 +94,21 @@ export const createClipFromMetadata = (
     codec: string
     filename: string
   },
-  durationOverride?: number
+  durationOverride?: number,
+  existingClips?: TimelineClip[]
 ): TimelineClip => {
   const duration = durationOverride ?? metadata.duration
 
-  // Auto-assign track: webcam → Track 1 (PiP), everything else → Track 0 (main)
-  const trackIndex: 0 | 1 = sourceType === 'webcam' ? 1 : 0
+  // Smart track assignment:
+  // - If there are no existing clips, assign to Track 0 (main)
+  // - If there are existing Track 0 clips, webcam → Track 1 (PiP), others → Track 0
+  let trackIndex: 0 | 1 = 0
+  if (existingClips && existingClips.length > 0) {
+    const hasTrack0Clips = existingClips.some((c) => c.trackIndex === 0)
+    if (hasTrack0Clips && sourceType === 'webcam') {
+      trackIndex = 1
+    }
+  }
 
   return {
     id: generateClipId(),
@@ -108,7 +117,7 @@ export const createClipFromMetadata = (
     sourceStartTime: 0,
     sourceDuration: metadata.duration,
     timelineDuration: duration,
-    trackIndex, // NEW
+    trackIndex,
     metadata: {
       filename: metadata.filename,
       resolution: `${metadata.width}x${metadata.height}`,
