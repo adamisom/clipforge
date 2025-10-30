@@ -52,6 +52,7 @@ declare global {
       onMenuExport: (callback: (event: IpcRendererEvent) => void) => void
       onMenuRecordWebcam: (callback: (event: IpcRendererEvent) => void) => void
       onMenuRecordScreen: (callback: (event: IpcRendererEvent) => void) => void
+      onMenuRecordSimultaneous: (callback: (event: IpcRendererEvent) => void) => void
       onCheckUnsavedRecordings: (callback: () => void) => void
       respondUnsavedRecordings: (hasTempFiles: boolean) => void
       removeAllListeners: (channel: string) => void

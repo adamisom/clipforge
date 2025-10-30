@@ -39,6 +39,8 @@ const api = {
     ipcRenderer.on('menu-record-webcam', callback),
   onMenuRecordScreen: (callback: (event: IpcRendererEvent) => void) =>
     ipcRenderer.on('menu-record-screen', callback),
+  onMenuRecordSimultaneous: (callback: (event: IpcRendererEvent) => void) =>
+    ipcRenderer.on('menu-record-simultaneous', callback),
   onCheckUnsavedRecordings: (callback: () => void) =>
     ipcRenderer.on('check-unsaved-recordings', callback),
   respondUnsavedRecordings: (hasTempFiles: boolean) =>

@@ -8,6 +8,7 @@ import { useClips } from './hooks/useClips'
 import { useClipImport } from './hooks/useClipImport'
 import { useRecording } from './hooks/useRecording'
 import { isTempFile } from './utils/clipUtils'
+import SimultaneousRecorder from './components/SimultaneousRecorder'
 
 // Feature flags
 const ENABLE_DRAG_AND_DROP = true
@@ -18,10 +19,13 @@ function App(): React.JSX.Element {
   const {
     showWebcamRecorder,
     showScreenRecorder,
+    showSimultaneousRecorder,
     setShowWebcamRecorder,
     setShowScreenRecorder,
+    setShowSimultaneousRecorder,
     handleWebcamRecordingComplete,
-    handleScreenRecordingComplete
+    handleScreenRecordingComplete,
+    handleSimultaneousRecordingComplete
   } = useRecording(addClip)
 
   const [isDragging, setIsDragging] = useState(false)
@@ -66,14 +70,20 @@ function App(): React.JSX.Element {
       setShowScreenRecorder(true)
     }
 
+    const handleMenuRecordSimultaneous = (): void => {
+      setShowSimultaneousRecorder(true)
+    }
+
     window.api.onMenuRecordWebcam(handleMenuRecordWebcam)
     window.api.onMenuRecordScreen(handleMenuRecordScreen)
+    window.api.onMenuRecordSimultaneous(handleMenuRecordSimultaneous)
 
     return () => {
       window.api.removeAllListeners('menu-record-webcam')
       window.api.removeAllListeners('menu-record-screen')
+      window.api.removeAllListeners('menu-record-simultaneous')
     }
-  }, [setShowWebcamRecorder, setShowScreenRecorder])
+  }, [setShowWebcamRecorder, setShowScreenRecorder, setShowSimultaneousRecorder])
 
   // Listen for quit check - respond with whether we have temp files
   useEffect(() => {
@@ -128,6 +138,13 @@ function App(): React.JSX.Element {
         <ScreenRecorder
           onRecordingComplete={handleScreenRecordingComplete}
           onClose={() => setShowScreenRecorder(false)}
+        />
+      )}
+
+      {showSimultaneousRecorder && (
+        <SimultaneousRecorder
+          onComplete={handleSimultaneousRecordingComplete}
+          onClose={() => setShowSimultaneousRecorder(false)}
         />
       )}
     </div>

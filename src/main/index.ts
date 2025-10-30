@@ -707,6 +707,13 @@ app.whenReady().then(async () => {
           click: () => {
             mainWindow.webContents.send('menu-record-screen')
           }
+        },
+        {
+          label: 'Record Screen + Webcam',
+          accelerator: 'CmdOrCtrl+Shift+B',
+          click: () => {
+            mainWindow.webContents.send('menu-record-simultaneous')
+          }
         }
       ]
     },
