@@ -227,15 +227,46 @@ body {
   background: #222;
 }
 
+.timeline-tracks {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  position: relative;
+}
+
 .timeline-track {
   height: 90px;
   position: relative;
   background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 4px;
+}
+
+.timeline-track[data-track="0"] {
+  height: 100px; /* Main track slightly taller */
+}
+
+.timeline-track[data-track="1"] {
+  height: 70px; /* PiP track slightly shorter */
+  opacity: 0.95;
+}
+
+.track-label {
+  position: absolute;
+  left: 8px;
+  top: 4px;
+  font-size: 11px;
+  color: #888;
+  text-transform: uppercase;
+  font-weight: 600;
+  pointer-events: none;
+  z-index: 1;
 }
 
 .timeline-clip {
   position: absolute;
-  height: 60px;
+  top: 20px; /* Leave room for track label */
+  height: 50px;
   background: #4a90e2;
   border-radius: 4px;
   color: #fff;
@@ -248,6 +279,11 @@ body {
   contain: layout style paint;
   border: 2px solid transparent;
   transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.timeline-track[data-track="1"] .timeline-clip {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); /* Purple gradient for PiP */
+  height: 40px;
 }
 
 .timeline-clip:hover {
@@ -302,8 +338,9 @@ body {
 /* Playhead */
 .playhead {
   position: absolute;
-  top: 0;
+  top: 30px; /* Start after time ruler */
   bottom: 0;
+  height: calc(100% - 30px); /* Span both tracks */
   width: 2px;
   background: red;
   z-index: 100;
@@ -328,6 +365,43 @@ body {
 
 .playhead:active::before {
   cursor: grabbing;
+}
+
+/* Context Menu */
+.context-menu-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 999;
+}
+
+.context-menu {
+  position: fixed;
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  padding: 4px 0;
+  min-width: 180px;
+}
+
+.context-menu button {
+  width: 100%;
+  padding: 8px 16px;
+  background: transparent;
+  border: none;
+  color: #fff;
+  text-align: left;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.2s;
+}
+
+.context-menu button:hover {
+  background: #444;
 }
 
 /* Video Preview */

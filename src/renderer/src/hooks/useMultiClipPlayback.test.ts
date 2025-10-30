@@ -12,6 +12,7 @@ describe('useMultiClipPlayback', () => {
       sourceStartTime: 0,
       sourceDuration: 30,
       timelineDuration: 10,
+      trackIndex: 0,
       metadata: { filename: 'video1.mp4', resolution: '1920x1080', codec: 'h264' }
     },
     {
@@ -21,6 +22,7 @@ describe('useMultiClipPlayback', () => {
       sourceStartTime: 5,
       sourceDuration: 20,
       timelineDuration: 8,
+      trackIndex: 0,
       metadata: { filename: 'video2.mp4', resolution: '1920x1080', codec: 'h264' }
     }
   ]

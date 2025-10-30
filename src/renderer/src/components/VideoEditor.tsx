@@ -59,6 +59,15 @@ function VideoEditor({
     [setSelectedClipId]
   )
 
+  const handleMoveToTrack = useCallback(
+    (clipId: string, trackIndex: 0 | 1) => {
+      setClips((prevClips) =>
+        prevClips.map((clip) => (clip.id === clipId ? { ...clip, trackIndex } : clip))
+      )
+    },
+    [setClips]
+  )
+
   const handleTrimChange = useCallback(
     (clipId: string, newTrimStart: number, newTrimEnd: number) => {
       setClips((prevClips) =>
@@ -285,6 +294,7 @@ function VideoEditor({
         onImport={onImport}
         onRecordScreen={onRecordScreen}
         onRecordWebcam={onRecordWebcam}
+        onMoveToTrack={handleMoveToTrack}
       />
 
       <InfoPanel

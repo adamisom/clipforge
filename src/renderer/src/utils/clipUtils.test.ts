@@ -18,6 +18,7 @@ describe('clipUtils', () => {
       sourceStartTime: 0,
       sourceDuration: 30,
       timelineDuration: 10,
+      trackIndex: 0,
       metadata: { filename: 'video1.mp4', resolution: '1920x1080', codec: 'h264' }
     },
     {
@@ -27,6 +28,7 @@ describe('clipUtils', () => {
       sourceStartTime: 5,
       sourceDuration: 20,
       timelineDuration: 8,
+      trackIndex: 0,
       metadata: { filename: 'recording.webm', resolution: '1280x720', codec: 'vp8' }
     },
     {
@@ -36,6 +38,7 @@ describe('clipUtils', () => {
       sourceStartTime: 0,
       sourceDuration: 15,
       timelineDuration: 15,
+      trackIndex: 0,
       metadata: { filename: 'video3.mp4', resolution: '640x480', codec: 'h264' }
     }
   ]

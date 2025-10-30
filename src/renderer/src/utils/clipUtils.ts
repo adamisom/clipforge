@@ -85,6 +85,9 @@ export const createClipFromMetadata = (
 ): TimelineClip => {
   const duration = durationOverride ?? metadata.duration
 
+  // Auto-assign track: webcam → Track 1 (PiP), everything else → Track 0 (main)
+  const trackIndex: 0 | 1 = sourceType === 'webcam' ? 1 : 0
+
   return {
     id: generateClipId(),
     sourceType,
@@ -92,6 +95,7 @@ export const createClipFromMetadata = (
     sourceStartTime: 0,
     sourceDuration: metadata.duration,
     timelineDuration: duration,
+    trackIndex, // NEW
     metadata: {
       filename: metadata.filename,
       resolution: `${metadata.width}x${metadata.height}`,
