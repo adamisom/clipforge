@@ -97,19 +97,51 @@ function VideoEditor({
     const outputPath = await window.api.selectSavePath()
     if (!outputPath) return
 
-    if (clips.length === 1) {
-      // Single clip export (simple trim)
-      await window.api.exportVideo(
-        clips[0].sourcePath,
-        outputPath,
-        clips[0].sourceStartTime,
-        clips[0].timelineDuration
-      )
+    // Separate clips by track
+    const track0Clips = clips.filter((c) => c.trackIndex === 0)
+    const track1Clips = clips.filter((c) => c.trackIndex === 1)
+
+    // Check if we have multi-track (Track 1 has clips)
+    const hasMultiTrack = track1Clips.length > 0
+
+    if (hasMultiTrack) {
+      // Multi-track export with PiP overlay
+      if (track0Clips.length === 0) {
+        alert('Multi-track export requires at least one clip on Track 0 (Main)')
+        return
+      }
+
+      // Optional: Warn if track durations don't match
+      const track0Duration = track0Clips.reduce((sum, c) => sum + c.timelineDuration, 0)
+      const track1Duration = track1Clips.reduce((sum, c) => sum + c.timelineDuration, 0)
+
+      if (Math.abs(track0Duration - track1Duration) > 0.5) {
+        const confirmed = window.confirm(
+          `Track duration mismatch detected:\n\n` +
+            `Track 0 (Main): ${track0Duration.toFixed(1)}s\n` +
+            `Track 1 (PiP): ${track1Duration.toFixed(1)}s\n\n` +
+            `The shorter track will be padded with black. Continue?`
+        )
+        if (!confirmed) return
+      }
+
+      await window.api.exportMultiTrack(track0Clips, track1Clips, pipConfig, outputPath)
     } else {
-      // Multi-clip export (concatenate)
-      await window.api.exportMultiClip(clips, outputPath)
+      // Single-track export (existing logic)
+      if (clips.length === 1) {
+        // Single clip export (simple trim)
+        await window.api.exportVideo(
+          clips[0].sourcePath,
+          outputPath,
+          clips[0].sourceStartTime,
+          clips[0].timelineDuration
+        )
+      } else {
+        // Multi-clip export (concatenate)
+        await window.api.exportMultiClip(clips, outputPath)
+      }
     }
-  }, [clips])
+  }, [clips, pipConfig])
 
   // Listen for menu events
   useEffect(() => {

@@ -12,6 +12,12 @@ const api = {
     ipcRenderer.invoke('export-video', { sourcePath, outputPath, trimStart, duration }),
   exportMultiClip: (clips: unknown[], outputPath: string) =>
     ipcRenderer.invoke('export-multi-clip', clips, outputPath),
+  exportMultiTrack: (
+    track0Clips: unknown[],
+    track1Clips: unknown[],
+    pipConfig: unknown,
+    outputPath: string
+  ) => ipcRenderer.invoke('export-multi-track', track0Clips, track1Clips, pipConfig, outputPath),
   selectSavePath: () => ipcRenderer.invoke('select-save-path'),
   saveRecordingBlob: (arrayBuffer: ArrayBuffer) =>
     ipcRenderer.invoke('save-recording-blob', arrayBuffer),
